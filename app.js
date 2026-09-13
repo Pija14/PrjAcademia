@@ -128,13 +128,21 @@ const DEFAULT_REST_SECONDS = 30;
 let restAlertTriggered = false;
 
 function exerciseReadyForStart(exercise) {
-  const series = Number(exercise?.series ?? exercise?.sets ?? exercise?.qtdSeries ?? parseInt(exercise?.prescribedSets));
-  const count = Number.isFinite(series) ? series : 0;
-  const sets = Array.isArray(exercise?.sets) ? exercise.sets : [];
-  const load = exercise?.carga ?? exercise?.load ?? exercise?.peso ?? exercise?.prescribedLoad;
-  const directLoad = load !== undefined && load !== null && String(load).trim() !== "";
-  const setLoad = sets.some(s => s && s.weight !== undefined && String(s.weight).trim() !== "");
-  return count > 0 && (directLoad || setLoad);
+  // A validação é feita SOMENTE para a série que será executada agora.
+  const count = exerciseSetCount(exercise);
+  if (!count) return {ok:false, message:"Informe o número de séries deste exercício."};
+
+  const ex = state.workout?.exercises?.[state.exerciseIndex];
+  if (!ex) return {ok:false, message:"Exercício inválido."};
+
+  const idx = Math.min(Math.max(state.currentSetIndex, 0), count - 1);
+  const set = ex.sets?.[idx] || {reps:"", weight:"", done:false};
+  const weight = String(set.weight ?? "").trim();
+  const reps = String(set.reps ?? "").trim();
+
+  if (!weight) return {ok:false, message:`Informe a carga da série ${idx + 1} antes de iniciar.`};
+  if (!reps) return {ok:false, message:`Informe as repetições da série ${idx + 1} antes de iniciar.`};
+  return {ok:true, index:idx};
 }
 
 function notifyOneMinuteRest() {
@@ -502,11 +510,12 @@ function allSetsDone(e){
 function startExerciseTimer(){
   if(state.restRunning || state.exerciseRunning) return;
   const e=currentExercise();
-  if(!exerciseReadyForStart(e)){
-    alert("Informe o número de séries e a carga antes de iniciar o exercício.");
+  if(allSetsDone(e)) return;
+  const ready=exerciseReadyForStart(e);
+  if(!ready.ok){
+    alert(ready.message);
     return;
   }
-  if(allSetsDone(e)) return;
 
   const idx=nextPendingSetIndex(e);
   if(idx>=0) state.currentSetIndex=idx;
@@ -635,11 +644,11 @@ function renderWorkout(){
     <section class="focus-card"><span class="eyebrow">${esc(e.section)}</span><h2>${esc(e.name)}</h2><div class="prescription">${e.prescribedSets||"Séries não informadas"} ${e.prescribedSets ? '<span>×</span> ' : ''}${e.prescribedReps||""}</div>
       <div class="set-status">${setLabel} • ${doneSets}${count?' de '+count:''} concluída(s)</div>
       <div class="big-timer" id="exerciseTimer">${fmt(state.exerciseTimer)}</div>
-      <div class="timer-actions"><button class="timer-start" onclick="${state.exerciseRunning?'pauseExerciseTimer()':'startExerciseTimer()'}" ${complete||state.restRunning?'disabled':''}>${state.exerciseRunning?'⏸ Pausar':'▶ Iniciar'}</button><button class="secondary" onclick="resetExerciseTimer()" ${state.restRunning?'disabled':''}>↺ Zerar</button></div>
-      ${state.exerciseRunning?`<button class="complete-exercise" onclick="completeExercise()" ${complete?'':'disabled'}>✓ Concluir exercício</button>`:''}
+      <div class="timer-actions"><button class="timer-start" onclick="startExerciseTimer()" ${complete||state.restRunning||state.exerciseRunning?'disabled':''}>${state.restRunning?'⏳ Descanso...':state.exerciseRunning?'⏱ Série em execução':(state.currentSetIndex>0?'▶ Iniciar próxima série':'▶ Iniciar série')}</button></div>
+      
       ${complete?`<div class="exercise-completed">✓ Exercício concluído</div>`:''}
     </section>
-    <section class="rest-card"><div><span class="eyebrow">DESCANSO</span><b id="restTimer">${fmtShort(state.restRunning?state.restTimer:30)}</b></div><button class="secondary" onclick="${state.restRunning?'stopRest()':'startRest()'}" ${complete?'disabled':''}>${state.restRunning?'Parar':'Iniciar descanso'}</button></section>
+    <section class="rest-card"><div><span class="eyebrow">DESCANSO</span><b id="restTimer">${fmtShort(state.restRunning?state.restTimer:30)}</b></div><span class="rest-status">${state.restRunning?'Descanso automático':'30s entre séries'}</span></section>
     ${last&&last.sets?.length?`<div class="last-load">Último registro: ${last.sets.map(s=>(s.weight?s.weight+" kg":"sem carga")).join(" • ")}</div>`:""}
     <section class="sets-card"><div class="section-title">Séries e carga</div>${renderSets(e)}</section>
     <div class="nav-ex"><button class="secondary" ${state.exerciseIndex===0?"disabled":""} onclick="prevExercise()">← Anterior</button><button class="primary" ${canNext?'':'disabled'} onclick="finishExercise()">${state.exerciseIndex===all.length-1?"Finalizar treino":"Próximo →"}</button></div>
@@ -653,10 +662,10 @@ function renderSets(e){
   if(!count)return `<div class="empty">A ficha original não informa a quantidade de séries deste exercício. Registre livremente:</div><div class="manual-set"><input type="number" min="0" placeholder="Reps"><input type="number" min="0" step=".5" placeholder="kg"><button onclick="addSet()">+</button></div>`;
   const ex=state.workout.exercises[state.exerciseIndex];
   while(ex.sets.length<count) ex.sets.push({reps:"",weight:"",done:false});
-  return ex.sets.map((s,i)=>`<div class="set-row"><span class="setnum">${i+1}</span><input value="${esc(s.reps)}" placeholder="${e.prescribedReps?.split("/")[i]||"reps"}" onchange="setValue(${i},'reps',this.value)"><input value="${esc(s.weight)}" placeholder="kg" inputmode="decimal" onchange="setValue(${i},'weight',this.value)"><button class="check ${s.done?'done':''}" onclick="toggleSet(${i})">${s.done?'✓':'○'}</button></div>`).join("");
+  return ex.sets.map((s,i)=>`<div class="set-row"><span class="setnum">${i+1}</span><input value="${esc(s.reps)}" placeholder="${e.prescribedReps?.split("/")[i]||"reps"}" onchange="setValue(${i},'reps',this.value)"><input value="${esc(s.weight)}" placeholder="kg" inputmode="decimal" onchange="setValue(${i},'weight',this.value)"><span class="check ${s.done?'done':''}">${s.done?'✓':'○'}</span></div>`).join("");
 }
 function setValue(i,k,v){state.workout.exercises[state.exerciseIndex].sets[i][k]=v;}
-function toggleSet(i){const ex=state.workout.exercises[state.exerciseIndex]; ex.sets[i].done=!ex.sets[i].done; if(ex.sets[i].done && i===state.currentSetIndex) state.currentSetIndex=i+1; if(!ex.sets[i].done) state.currentSetIndex=Math.min(state.currentSetIndex,i); renderWorkout();}
+function toggleSet(i){ return; }
 function addSet(){state.workout.exercises[state.exerciseIndex].sets.push({reps:"",weight:"",done:false});renderWorkout();}
 function finishExercise(){
   const e=currentExercise();
