@@ -257,7 +257,19 @@ const DEFAULTS = {
   workoutPlans: {A:null,B:null,C:null},
   workoutNames: {A:"Treino A",B:"Treino B",C:"Treino C"}
 };
-let db = JSON.parse(localStorage.getItem(KEY) || "null") || DEFAULTS;
+let db;
+try {
+  db = JSON.parse(localStorage.getItem(KEY) || "null") || JSON.parse(JSON.stringify(DEFAULTS));
+} catch(e) {
+  db = JSON.parse(JSON.stringify(DEFAULTS));
+}
+if(!Array.isArray(db.workouts)) db.workouts=[];
+if(!db.settings || typeof db.settings!=="object") db.settings={rest:90,sound:true,vibration:true,theme:"light"};
+if(!db.settings.rest || Number(db.settings.rest)<1) db.settings.rest=90;
+if(!db.excludedExercises || typeof db.excludedExercises!=="object") db.excludedExercises={A:[],B:[],C:[]};
+if(!db.customExercises || typeof db.customExercises!=="object") db.customExercises={A:[],B:[],C:[]};
+if(!db.workoutPlans || typeof db.workoutPlans!=="object") db.workoutPlans={A:null,B:null,C:null};
+if(!db.workoutNames || typeof db.workoutNames!=="object") db.workoutNames={A:"Treino A",B:"Treino B",C:"Treino C"};
 if(!db.excludedExercises) db.excludedExercises = {A:[],B:[],C:[]};
 if(!db.customExercises) db.customExercises = {A:[],B:[],C:[]};
 if(!db.workoutPlans) db.workoutPlans = {A:null,B:null,C:null};
@@ -548,7 +560,7 @@ function updateTimers(){
 
 function renderWorkout(){
   const e=currentExercise(), all=state.workout.exercises, progress=Math.round(((state.exerciseIndex+1)/all.length)*100);
-  const last=db.workouts.flatMap(w=>w.exercises||[]).findLast?.(x=>x.name===e.name) || null;
+  const last=db.workouts.flatMap(w=>w.exercises||[]).slice().reverse().find(x=>x.name===e.name) || null;
   const count=exerciseSetCount(e);
   const doneSets=count ? e.sets.slice(0,count).filter(s=>s.done).length : 0;
   const complete=allSetsDone(e);
