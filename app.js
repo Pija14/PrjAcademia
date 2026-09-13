@@ -468,7 +468,7 @@ function startExerciseTimer(){
 }
 
 function pauseExerciseTimer(){
-  // Não existe pausa durante a série: ela dura exatamente 60 segundos.
+  // Série fixa de 60 segundos: não há pausa.
   return;
 }
 
@@ -478,7 +478,6 @@ function startMainTick(){
     if(state.exerciseRunning && state.exerciseStartedAt){
       state.exerciseTimer=(Date.now()-state.exerciseStartedAt)/1000;
 
-      // A série dura exatamente 60 segundos.
       if(state.exerciseTimer>=60){
         state.exerciseTimer=60;
         state.exerciseRunning=false;
@@ -488,8 +487,8 @@ function startMainTick(){
           state.timerInterval=null;
         }
 
-        // Apita/vibra aos 60s e inicia automaticamente os 30s de descanso.
-        if(navigator.vibrate && db.settings.vibration) navigator.vibrate([250,120,250,120,250]);
+        // 1 minuto de exercício terminou: alerta e inicia descanso de 30s.
+        if(navigator.vibrate && db.settings.vibration) navigator.vibrate([250,120,250]);
         beep();
         startRest();
         return;
@@ -517,7 +516,6 @@ function startRest(){
     state.restTimer-=1;
     updateTimers();
 
-    // Após exatamente 30s, a série é concluída.
     if(state.restTimer<=0){
       finishRestAndEnableNextSeries();
     }
@@ -541,17 +539,15 @@ function finishRestAndEnableNextSeries(){
   const count=exerciseSetCount(e);
   const ex=state.workout.exercises[state.exerciseIndex];
 
-  // Só agora a série atual é considerada concluída.
+  // A série somente é concluída depois dos 30 segundos de descanso.
   const idx=Math.min(state.currentSetIndex,count-1);
-  ex.sets[idx].done=true;
+  if(ex.sets[idx]) ex.sets[idx].done=true;
   state.currentSetIndex=idx+1;
 
-  // Apita/vibra quando o descanso terminar.
+  // Fim do descanso: alerta e libera a próxima série.
   if(navigator.vibrate && db.settings.vibration) navigator.vibrate([250,120,250]);
   beep();
 
-  // NÃO inicia a próxima série automaticamente.
-  // Apenas libera o botão "Iniciar próxima série".
   state.exerciseTimer=0;
   state.exerciseStartedAt=null;
   state.exerciseOneMinuteAlerted=false;
@@ -560,7 +556,7 @@ function finishRestAndEnableNextSeries(){
 }
 
 function stopRest(){
-  // O descanso é obrigatório e não pode ser interrompido.
+  // O descanso não pode ser pulado/interrompido.
   return;
 }
 
@@ -587,11 +583,8 @@ function renderWorkout(){
     <section class="focus-card"><span class="eyebrow">${esc(e.section)}</span><h2>${esc(e.name)}</h2><div class="prescription">${e.prescribedSets||"Séries não informadas"} ${e.prescribedSets ? '<span>×</span> ' : ''}${e.prescribedReps||""}</div>
       <div class="set-status">${setLabel} • ${doneSets}${count?' de '+count:''} concluída(s)</div>
       <div class="big-timer" id="exerciseTimer">${fmt(state.exerciseTimer)}</div>
-      <div class="timer-actions">
-        <button class="timer-start" onclick="startExerciseTimer()" ${state.exerciseRunning||state.restRunning||complete?'disabled':''}>
-          ${state.restRunning?'Descansando…':(doneSets>0?'▶ Iniciar próxima série':'▶ Iniciar série')}
-        </button>
-      </div>
+      <div class="timer-actions"><button class="timer-start" onclick="${state.exerciseRunning?'pauseExerciseTimer()':'startExerciseTimer()'}" ${complete||state.restRunning?'disabled':''}>${state.exerciseRunning?'⏸ Pausar':'▶ Iniciar'}</button><button class="secondary" onclick="resetExerciseTimer()" ${state.restRunning?'disabled':''}>↺ Zerar</button></div>
+      ${state.exerciseRunning?`<button class="complete-exercise" onclick="completeExercise()" ${complete?'':'disabled'}>✓ Concluir exercício</button>`:''}
       ${complete?`<div class="exercise-completed">✓ Exercício concluído</div>`:''}
     </section>
     <section class="rest-card"><div><span class="eyebrow">DESCANSO</span><b id="restTimer">${fmtShort(state.restRunning?state.restTimer:30)}</b></div><button class="secondary" onclick="${state.restRunning?'stopRest()':'startRest()'}" ${complete?'disabled':''}>${state.restRunning?'Parar':'Iniciar descanso'}</button></section>
@@ -608,7 +601,7 @@ function renderSets(e){
   if(!count)return `<div class="empty">A ficha original não informa a quantidade de séries deste exercício. Registre livremente:</div><div class="manual-set"><input type="number" min="0" placeholder="Reps"><input type="number" min="0" step=".5" placeholder="kg"><button onclick="addSet()">+</button></div>`;
   const ex=state.workout.exercises[state.exerciseIndex];
   while(ex.sets.length<count) ex.sets.push({reps:"",weight:"",done:false});
-  return ex.sets.map((s,i)=>`<div class="set-row"><span class="setnum">${i+1}</span><input value="${esc(s.reps)}" placeholder="${e.prescribedReps?.split("/")[i]||"reps"}" onchange="setValue(${i},'reps',this.value)"><input value="${esc(s.weight)}" placeholder="kg" inputmode="decimal" onchange="setValue(${i},'weight',this.value)"><span class="check ${s.done?'done':''}">${s.done?'✓':'○'}</span></div>`).join("");
+  return ex.sets.map((s,i)=>`<div class="set-row"><span class="setnum">${i+1}</span><input value="${esc(s.reps)}" placeholder="${e.prescribedReps?.split("/")[i]||"reps"}" onchange="setValue(${i},'reps',this.value)"><input value="${esc(s.weight)}" placeholder="kg" inputmode="decimal" onchange="setValue(${i},'weight',this.value)"><button class="check ${s.done?'done':''}" onclick="toggleSet(${i})">${s.done?'✓':'○'}</button></div>`).join("");
 }
 function setValue(i,k,v){state.workout.exercises[state.exerciseIndex].sets[i][k]=v;}
 function toggleSet(i){const ex=state.workout.exercises[state.exerciseIndex]; ex.sets[i].done=!ex.sets[i].done; if(ex.sets[i].done && i===state.currentSetIndex) state.currentSetIndex=i+1; if(!ex.sets[i].done) state.currentSetIndex=Math.min(state.currentSetIndex,i); renderWorkout();}
