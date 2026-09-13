@@ -98,3 +98,6 @@ button:disabled{opacity:.45;cursor:not-allowed;transform:none!important}
 .workout-config-name{margin:7px 0 16px;font-size:18px;font-weight:900}
 .config-label{display:block;margin:10px 0;font-size:13px;font-weight:800}
 .config-label .library-search{margin-top:5px}
+
+/* v18: tela de apresentação sem controles; editor usa somente switch */
+.presentation .exercise-switch{display:none!important}

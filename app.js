@@ -251,7 +251,7 @@ const ALL_EXERCISES = Object.fromEntries(
 const KEY = "meuTreinoDataV1";
 const DEFAULTS = {
   workouts: [],
-  settings: {rest:60, sound:true, vibration:true, theme:"light"},
+  settings: {rest:90, sound:true, vibration:true, theme:"light"},
   excludedExercises: {A:[],B:[],C:[]},
   customExercises: {A:[],B:[],C:[]},
   workoutPlans: {A:null,B:null,C:null},
@@ -261,6 +261,8 @@ let db = JSON.parse(localStorage.getItem(KEY) || "null") || DEFAULTS;
 if(!db.excludedExercises) db.excludedExercises = {A:[],B:[],C:[]};
 if(!db.customExercises) db.customExercises = {A:[],B:[],C:[]};
 if(!db.workoutPlans) db.workoutPlans = {A:null,B:null,C:null};
+if(!db.settings) db.settings={rest:90,sound:true,vibration:true,theme:"light"};
+if(!db.settings.rest || db.settings.rest===60) db.settings.rest=90;
 if(!db.workoutNames) db.workoutNames = {A:"Treino A",B:"Treino B",C:"Treino C"};
 ["A","B","C"].forEach(k=>{
   if(!Array.isArray(db.excludedExercises[k])) db.excludedExercises[k]=[];
@@ -310,101 +312,30 @@ function ensureWorkoutPlan(code){
 function customizeTraining(code){ ensureWorkoutPlan(code); editTraining(code); }
 function editTraining(code){
   const plan=ensureWorkoutPlan(code);
-  const used=new Set(plan.map(e=>e.id));
-  const available=allExerciseLibrary().filter(e=>!used.has(e.id));
   const sections=[...new Set(plan.map(e=>e.section||"Outros"))];
-  const grouped=sections.map(sec=>({sec,items:plan.filter(e=>(e.section||"Outros")===sec)}));
+  const sectionsHtml=sections.map(sec=>{
+    const rows=plan.filter(e=>(e.section||"Outros")===sec).map((e,i)=>{
+      const en=e.enabled!==false;
+      return `<div class="exercise-row ${en?'':'exercise-disabled'}">
+        <div><b>${i+1}. ${esc(e.name)}</b>
+        <small>${e.sets?esc(e.sets)+' séries':''}${e.reps?' • '+esc(e.reps):''}${en?'':' • desativado'}</small></div>
+        <label class="exercise-switch" title="${en?'Desativar':'Ativar'} ${esc(e.name)}">
+          <input type="checkbox" ${en?'checked':''}
+            onchange="toggleExercise(${JSON.stringify(code)},${JSON.stringify(e.id)},this.checked)"
+            aria-label="${en?'Desativar':'Ativar'} ${esc(e.name)}">
+          <span class="switch-slider"></span>
+        </label>
+      </div>`;
+    }).join("");
+    return `<section class="section"><div class="section-title">${esc(sec)}</div>${rows}</section>`;
+  }).join("");
+
   layout(`<button class="back" onclick="viewTraining('${code}')">‹ Voltar</button>
-    <div class="detail-head"><span class="badge">${code}</span><div><h2>Personalizar ${esc(trainingName(code))}</h2><p>Monte seu treino com exercícios existentes ou crie novos.</p></div></div>
-    <section class="settings-card"><label>Nome do treino<input id="workoutNameEdit" value="${esc(trainingName(code))}" maxlength="50" placeholder="Ex.: Treino A — Força"></label></section>
-    <div class="training-tools"><span>${plan.filter(e=>e.enabled!==false).length} ativos • ${plan.length} no treino</span><button class="secondary compact" onclick="activatePlanAll('${code}')">Ativar todos</button></div>
-    ${grouped.map(g=>`<section class="section"><div class="section-title">${esc(g.sec)}</div>${g.items.map((e,i)=>`<div class="exercise-row ${e.enabled===false?'exercise-disabled':''}">
-      <div><b>${esc(e.name)}</b><small>${esc(e.source||'Exercício')}${e.sets?` • ${esc(e.sets)} séries`:''}${e.reps?` • ${esc(e.reps)}`:''}${e.enabled===false?' • desativado':''}</small></div>
-      <label class="exercise-switch"><input type="checkbox" ${e.enabled!==false?'checked':''} onchange="setPlanEnabled('${code}',${JSON.stringify(e.id)},this.checked)"><span class="switch-slider"></span></label>
-      <button class="delete-exercise" title="Remover do treino" onclick="removeFromPlan('${code}',${JSON.stringify(e.id)})">×</button>
-    </div>`).join('')}</section>`).join('')}
-    <section class="settings-card"><h3>Adicionar exercício existente</h3><p class="muted">Escolha qualquer exercício que já esteja cadastrado no aplicativo.</p>
-      <select id="libraryExerciseSelect"><option value="">Selecione um exercício...</option>${available.map(e=>`<option value="${esc(e.id)}">${esc(e.name)} — ${esc(e.source||e.section)}</option>`).join('')}</select>
-      <button class="secondary full" onclick="addExistingToPlan('${code}')">＋ Adicionar selecionado</button>
-    </section>
-    <button class="add-exercise" onclick="openAddExercise('${code}',true)">＋ Criar exercício manualmente neste treino</button>
-    <button class="primary full" onclick="saveTrainingCustomization('${code}')">✓ Salvar meu ${esc(trainingName(code))}</button>`,'trainings');
-}
-function setPlanEnabled(code,id,enabled){ const p=ensureWorkoutPlan(code), e=p.find(x=>x.id===id); if(e)e.enabled=enabled; save(); editTraining(code); }
-function removeFromPlan(code,id){ if(!confirm('Remover este exercício deste treino? Ele não será apagado da biblioteca.'))return; db.workoutPlans[code]=ensureWorkoutPlan(code).filter(e=>e.id!==id); save(); editTraining(code); }
-function addExistingToPlan(code){ const id=document.getElementById('libraryExerciseSelect')?.value; if(!id)return; const item=allExerciseLibrary().find(e=>e.id===id); if(!item)return; ensureWorkoutPlan(code).push({...item,enabled:true}); save(); editTraining(code); }
-function activatePlanAll(code){ ensureWorkoutPlan(code).forEach(e=>e.enabled=true); save(); editTraining(code); }
-function saveTrainingCustomization(code){
-  const name=document.getElementById('workoutNameEdit')?.value.trim() || `Treino ${code}`;
-  db.workoutNames[code]=name; save(); viewTraining(code);
-}
-
-function todayISO(){ return new Date().toISOString().slice(0,10); }
-function dateBR(iso){ if(!iso)return ""; const [y,m,d]=iso.split("-"); return `${d}/${m}/${y}`; }
-function totalExercises(code){ return flatTraining(code).length; }
-function monthLabel(y,m){ return new Intl.DateTimeFormat("pt-BR",{month:"long",year:"numeric"}).format(new Date(y,m,1)); }
-
-function layout(content, active="home"){
-  document.getElementById("app").innerHTML = `
-  <div class="shell">
-    <header class="topbar"><div><div class="eyebrow">CONTROLE DE TREINO</div><h1>Meu Treino</h1></div>
-      <button class="iconbtn" onclick="openSettings()" aria-label="Configurações">⚙</button>
-    </header>
-    <main>${content}</main>
-    <nav class="bottomnav">
-      <button class="${active==='home'?'active':''}" onclick="go('home')"><span>⌂</span>Início</button>
-      <button class="${active==='calendar'?'active':''}" onclick="go('calendar')"><span>▦</span>Calendário</button>
-      <button class="${active==='trainings'?'active':''}" onclick="go('trainings')"><span>💪</span>Treinos</button>
-      <button class="${active==='history'?'active':''}" onclick="go('history')"><span>◷</span>Histórico</button>
-    </nav>
-  </div>`;
-}
-
-function go(page){ stopIntervals(); state.page=page; state.training=null; state.workout=null; if(page==="home")renderHome(); if(page==="calendar")renderCalendar(); if(page==="trainings")renderTrainings(); if(page==="history")renderHistory(); }
-function renderHome(){
-  const recent=db.workouts[db.workouts.length-1];
-  const month=todayISO().slice(0,7);
-  const count=db.workouts.filter(w=>w.date.startsWith(month)).length;
-  const total=db.workouts.reduce((a,w)=>a+(w.totalTime||0),0);
-  layout(`
-    <section class="hero"><div><span class="pill">4–5x por semana</span><h2>Pronto para treinar?</h2><p>Escolha a divisão e acompanhe cada exercício, série e tempo.</p></div><div class="hero-icon">⚡</div></section>
-    <div class="stats"><div><b>${count}</b><span>treinos no mês</span></div><div><b>${fmtShort(total)}</b><span>tempo total</span></div><div><b>${recent?recent.type:"—"}</b><span>último treino</span></div></div>
-    <h3>Divisão</h3>
-    <div class="training-grid">${["A","B","C"].map(code=>{
-      const t=TRAININGS[code];
-      return `<article class="training-card ${code.toLowerCase()}"><div class="card-top"><span class="badge">${code}</span><span class="exercise-count">${totalExercises(code)} exercícios</span></div><h3>${esc(trainingName(code))}</h3><p>${t.muscles.join(" • ")}</p><button class="primary" onclick="startWorkout('${code}')">▶ Iniciar treino</button></article>`
-    }).join("")}</div>
-    ${recent?`<section class="recent"><div><span class="eyebrow">ÚLTIMO TREINO</span><h3>${recent.type} • ${dateBR(recent.date)}</h3><p>${fmt(recent.totalTime||0)} • ${recent.completedExercises||0} exercícios</p></div><button class="secondary" onclick="showWorkoutDetails('${recent.id}')">Detalhes</button></section>`:""}
-  `,"home");
-}
-
-function renderTrainings(){
-  layout(`<h2>Treinos A, B e C</h2><p class="muted">Toque em um treino para ver todos os exercícios.</p>
-    <div class="list">${["A","B","C"].map(c=>`<button class="list-card" onclick="viewTraining('${c}')"><span class="badge">${c}</span><div><b>${esc(trainingName(c))}</b><small>${TRAININGS[c].muscles.join(" • ")}</small></div><span>›</span></button>`).join("")}</div>`,"trainings");
-}
-
-function exerciseId(code, section, index){ return `${code}-${section}-${index}`; }
-
-function isExerciseEnabled(code, id){
-  return !(db.excludedExercises?.[code] || []).includes(id);
-}
-
-function toggleExercise(code, id, enabled){
-  if(Array.isArray(db.workoutPlans?.[code])){
-    const e=db.workoutPlans[code].find(x=>x.id===id); if(e)e.enabled=enabled;
-  }else{
-    if(!db.excludedExercises[code])db.excludedExercises[code]=[];
-    const list=db.excludedExercises[code];
-    if(enabled) db.excludedExercises[code]=list.filter(x=>x!==id);
-    else if(!list.includes(id)) list.push(id);
-  }
-  save(); viewTraining(code);
-}
-
-function restoreExercises(code){
-  if(Array.isArray(db.workoutPlans?.[code])){db.workoutPlans[code].forEach(e=>e.enabled=true);save();viewTraining(code);return;}
-  if(!db.excludedExercises?.[code]?.length){alert('Todos os exercícios já estão ativos.');return;}
-  db.excludedExercises[code]=[]; save(); viewTraining(code);
+    <div class="detail-head"><span class="badge">${code}</span><div><h2>Editar ${esc(trainingName(code))}</h2><p>Ative ou desative os exercícios do treino.</p></div></div>
+    ${sectionsHtml}
+    <button class="add-exercise" onclick="openAddExercise('${code}',true)">＋ Adicionar exercício</button>
+    <button class="primary full" onclick="save(); viewTraining('${code}')">✓ Salvar treino</button>
+  `,"trainings");
 }
 
 function openAddExercise(code, intoPlan=false){
@@ -450,29 +381,26 @@ function saveCustomExercise(code, intoPlan=false){
 }
 
 function viewTraining(code){
+  // Tela de apresentação: SOMENTE visualização. Sem switch e sem botão X.
   const t=TRAININGS[code];
-  const customized=Array.isArray(db.workoutPlans?.[code]);
-  const plan=customized ? db.workoutPlans[code] : null;
-  const excluded=new Set(db.excludedExercises?.[code] || []);
-  const custom=db.customExercises?.[code] || [];
-  const visibleCount=flatTraining(code).length;
-  const totalCount=customized ? plan.length : t.sections.reduce((n,s)=>n+s.exercises.length,0)+custom.length;
-  const switchHtml=(id, enabled, name)=>`<label class="exercise-switch" title="${enabled?'Desativar':'Ativar'} ${esc(name)}"><input type="checkbox" ${enabled?'checked':''} onchange="toggleExercise(${JSON.stringify(code)},${JSON.stringify(id)},this.checked)" aria-label="${enabled?'Desativar':'Ativar'} ${esc(name)}"><span class="switch-slider"></span></label>`;
-  let sectionsHtml='';
-  if(customized){
-    const sections=[...new Set(plan.map(e=>e.section||'Outros'))];
-    sectionsHtml=sections.map(sec=>`<section class="section"><div class="section-title">${esc(sec)}</div>${plan.filter(e=>(e.section||'Outros')===sec).map((e,i)=>{const en=e.enabled!==false;return `<div class="exercise-row ${en?'':'exercise-disabled'}"><div><b>${i+1}. ${esc(e.name)}</b><small>${e.sets?esc(e.sets)+' séries':''}${e.reps?' • '+esc(e.reps):''}${e.custom?' • meu exercício':''}${en?'':' • desativado'}</small></div>${switchHtml(e.id,en,e.name)}</div>`}).join('')}</section>`).join('');
-  }else{
-    sectionsHtml=t.sections.map(s=>{let number=0;const rows=s.exercises.map((e,i)=>{const id=exerciseId(code,s.name,i),enabled=!excluded.has(id);number++;return `<div class="exercise-row ${enabled?'':'exercise-disabled'}"><div><b>${number}. ${esc(e[0])}</b><small>${e[1]?e[1]+' séries':'Séries não informadas'}${e[2]?' • '+e[2]:''}${enabled?'':' • desativado'}</small></div>${switchHtml(id,enabled,e[0])}</div>`}).join('');return `<section class="section"><div class="section-title">${s.name}</div>${rows}</section>`}).join('');
-    const customRows=custom.map(e=>{const enabled=isExerciseEnabled(code,e.id);return `<div class="exercise-row ${enabled?'':'exercise-disabled'}"><div><b>+ ${esc(e.name)}</b><small>${esc(e.section)}${e.sets?' • '+esc(e.sets)+' séries':''}${e.reps?' • '+esc(e.reps):''}${enabled?'':' • desativado'}</small></div>${switchHtml(e.id,enabled,e.name)}</div>`}).join('');
-    if(customRows) sectionsHtml+=`<section class="section"><div class="section-title">Meus exercícios</div>${customRows}</section>`;
-  }
+  const ex=flatTraining(code);
+  const groups=[...new Set(ex.map(e=>e.section||"Outros"))];
+
+  const sectionsHtml=groups.map(sec=>{
+    const rows=ex.filter(e=>(e.section||"Outros")===sec).map((e,i)=>
+      `<div class="exercise-row">
+        <div><b>${i+1}. ${esc(e.name)}</b>
+        <small>${e.sets?esc(e.sets)+' séries':'Séries não informadas'}${e.reps?' • '+esc(e.reps):''}</small></div>
+      </div>`).join("");
+    return `<section class="section"><div class="section-title">${esc(sec)}</div>${rows}</section>`;
+  }).join("");
+
   layout(`<button class="back" onclick="go('trainings')">‹ Voltar</button>
-    <div class="detail-head"><span class="badge">${code}</span><div><h2>${esc(trainingName(code))}</h2><p>${customized?'Treino personalizado':'Treino padrão'} • ${t.muscles.join(' • ')}</p></div></div>
-    <div class="training-tools"><span>${visibleCount} ativo(s) de ${totalCount}</span>${customized?`<button class="secondary compact" onclick="editTraining('${code}')">✎ Editar treino</button>`:(excluded.size?`<button class="secondary compact" onclick="restoreExercises('${code}')">✓ Ativar todos</button>`:'')}</div>
-    ${sectionsHtml}
-    ${customized?`<button class="add-exercise" onclick="editTraining('${code}')">＋ Adicionar ou organizar exercícios</button>`:`<button class="add-exercise" onclick="openAddExercise('${code}')">＋ Adicionar exercício manualmente</button><button class="secondary full" onclick="customizeTraining('${code}')">✎ Personalizar ${esc(trainingName(code))}</button>`}
-    ${visibleCount?`<button class="primary full" onclick="startWorkout('${code}')">▶ Iniciar ${esc(trainingName(code))}</button>`:`<div class="empty big">Este treino está sem exercícios ativos. Ative pelo menos um exercício para iniciar.</div>`}`,'trainings');
+    <div class="detail-head"><span class="badge">${code}</span><div><h2>${esc(trainingName(code))}</h2><p>Apresentação do treino</p></div></div>
+    ${sectionsHtml || '<div class="empty big">Nenhum exercício ativo neste treino.</div>'}
+    <button class="primary full" onclick="startWorkout('${code}')">▶ Iniciar treino</button>
+    <button class="secondary full" onclick="editTraining('${code}')">✎ Editar treino</button>
+  `,"trainings");
 }
 
 function startWorkout(code){
@@ -482,6 +410,15 @@ function startWorkout(code){
   state.workout={id:Date.now().toString(), type:code, date:todayISO(), startedAt:new Date().toISOString(), totalTime:0, exercises:ex.map(e=>({id:e.id,name:e.name,section:e.section,prescribedSets:e.sets,prescribedReps:e.reps,duration:0,sets:[]}))};
   state.workoutTimerStart=Date.now();
   renderWorkout();
+}
+
+function persistWorkout(){
+  if(!state.workout) return;
+  const total=(Date.now()-(state.workoutTimerStart||Date.now()))/1000;
+  state.workout.totalTime=Math.round(total);
+  state.workout.completedExercises=(state.workout.exercises||[]).filter(e=>e.completed).length;
+  db.workouts.push(JSON.parse(JSON.stringify(state.workout)));
+  save();
 }
 
 function currentExercise(){ return state.workout.exercises[state.exerciseIndex]; }
@@ -648,6 +585,8 @@ function setValue(i,k,v){state.workout.exercises[state.exerciseIndex].sets[i][k]
 function toggleSet(i){const ex=state.workout.exercises[state.exerciseIndex]; ex.sets[i].done=!ex.sets[i].done; if(ex.sets[i].done && i===state.currentSetIndex) state.currentSetIndex=i+1; if(!ex.sets[i].done) state.currentSetIndex=Math.min(state.currentSetIndex,i); renderWorkout();}
 function addSet(){state.workout.exercises[state.exerciseIndex].sets.push({reps:"",weight:"",done:false});renderWorkout();}
 function finishExercise(){
+  if(!state.workout) return;
+
   const e=currentExercise();
   if(!allSetsDone(e)) return;
   pauseExerciseTimer(); stopRest();
