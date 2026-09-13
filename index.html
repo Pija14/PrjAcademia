@@ -14,5 +14,246 @@
   <div id="app"></div>
   <script src="app.js?v=11"></script>
 <div id="exercise-start-validation" class="exercise-start-error" style="display:none">Número de séries e carga são obrigatórios para iniciar.</div>
+
+<section id="exercise-library" class="exercise-library-card">
+  <div class="library-header">
+    <div>
+      <div class="library-title">Biblioteca de exercícios</div>
+      <div class="library-subtitle">Exercícios salvos neste aparelho</div>
+    </div>
+    <button type="button" id="btn-refresh-exercise-library" class="library-refresh">Atualizar</button>
+  </div>
+  <input id="exercise-library-search" class="library-search" type="search"
+         placeholder="Pesquisar exercício..." autocomplete="off">
+  <div id="exercise-library-list" class="library-list"></div>
+</section>
+
+<script>
+(function(){
+  async function renderLibrary(){
+    const list = document.getElementById("exercise-library-list");
+    if (!list || !window.ExerciseLibrary) return;
+    const term = document.getElementById("exercise-library-search")?.value || "";
+    const items = await ExerciseLibrary.search(term);
+    list.innerHTML = items.length
+      ? items.map(e => '<button type="button" class="library-item" data-exercise-id="'+e.id+'">'+
+          '<span>'+String(e.nome).replace(/</g,"&lt;")+'</span><span>›</span></button>').join("")
+      : '<div class="library-empty">Nenhum exercício encontrado.</div>';
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("exercise-library-search")?.addEventListener("input", renderLibrary);
+    document.getElementById("btn-refresh-exercise-library")?.addEventListener("click", renderLibrary);
+    renderLibrary();
+  });
+})();
+</script>
+
+
+<div id="exercise-picker" class="exercise-picker" hidden>
+  <div class="exercise-picker-backdrop" data-close-picker></div>
+  <div class="exercise-picker-dialog">
+    <div class="exercise-picker-head">
+      <div>
+        <div class="exercise-picker-title">Adicionar exercício</div>
+        <div class="exercise-picker-subtitle">Pesquise um exercício ou crie um novo</div>
+      </div>
+      <button type="button" class="exercise-picker-close" data-close-picker>×</button>
+    </div>
+
+    <input id="exercise-picker-search" class="library-search"
+           type="search" placeholder="Pesquisar exercício..." autocomplete="off">
+
+    <div id="exercise-picker-results" class="library-list"></div>
+
+    <div class="exercise-create-box">
+      <input id="exercise-picker-new-name" class="library-search"
+             type="text" placeholder="Nome do novo exercício">
+      <input id="exercise-picker-muscle" class="library-search"
+             type="text" placeholder="Grupo muscular (opcional)">
+      <input id="exercise-picker-equipment" class="library-search"
+             type="text" placeholder="Equipamento (opcional)">
+      <button type="button" id="exercise-picker-create" class="complete-exercise">
+        Criar e adicionar exercício
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+(function(){
+  const $=s=>document.querySelector(s);
+  function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
+  async function renderPicker(){
+    const q=$("#exercise-picker-search")?.value||"";
+    const results=await (window.ExerciseLibrary?.search?.(q)||[]);
+    const box=$("#exercise-picker-results");
+    if(!box)return;
+    box.innerHTML=results.length ? results.map(e=>
+      '<button type="button" class="library-item picker-item" data-id="'+e.id+'">'+
+      '<span>'+esc(e.nome)+'</span><span>Selecionar ›</span></button>'
+    ).join("") : '<div class="library-empty">Nenhum exercício encontrado.</div>';
+  }
+
+  function openPicker(){
+    const p=$("#exercise-picker"); if(!p)return;
+    p.hidden=false; document.body.classList.add("picker-open");
+    renderPicker(); setTimeout(()=>$("#exercise-picker-search")?.focus(),50);
+  }
+  function closePicker(){
+    const p=$("#exercise-picker"); if(!p)return;
+    p.hidden=true; document.body.classList.remove("picker-open");
+  }
+
+  async function selectExercise(id){
+    const all=await ExerciseLibrary.list();
+    const ex=all.find(e=>String(e.id)===String(id));
+    if(!ex)return;
+
+    // Preenche o primeiro conjunto de campos compatível encontrado.
+    const map=[
+      [["#exercise-name","#exercicio-nome",'[name="exercise-name"]','[name="exercicio"]','[name="nome-exercicio"]'], ex.nome],
+      [["#exercise-series","#exercicio-series",'[name="series"]','[name="qtd-series"]'], ex.series||""],
+      [["#exercise-load","#exercicio-carga",'[name="carga"]','[name="load"]'], ex.carga??""],
+      [["#exercise-reps","#exercicio-repeticoes",'[name="repeticoes"]','[name="reps"]'], ex.repeticoes||""]
+    ];
+    map.forEach(([selectors,value])=>{
+      const el=selectors.map(s=>document.querySelector(s)).find(Boolean);
+      if(el){el.value=value; el.dispatchEvent(new Event("input",{bubbles:true})); el.dispatchEvent(new Event("change",{bubbles:true}));}
+    });
+    closePicker();
+  }
+
+  async function createExercise(){
+    const name=$("#exercise-picker-new-name")?.value.trim();
+    if(!name){ alert("Informe o nome do exercício."); return; }
+    const ex=await ExerciseLibrary.create(name,{
+      grupoMuscular:$("#exercise-picker-muscle")?.value.trim()||"",
+      equipamento:$("#exercise-picker-equipment")?.value.trim()||""
+    });
+    $("#exercise-picker-new-name").value="";
+    await renderPicker();
+    await selectExercise(ex.id);
+  }
+
+  document.addEventListener("DOMContentLoaded",()=>{
+    document.addEventListener("click",e=>{
+      const add=e.target.closest('[data-add-exercise], #btn-add-exercise, #add-exercise, .btn-add-exercise');
+      if(add){e.preventDefault();openPicker();return;}
+      const close=e.target.closest("[data-close-picker]");
+      if(close){closePicker();return;}
+      const item=e.target.closest(".picker-item");
+      if(item){selectExercise(item.dataset.id);return;}
+    });
+    $("#exercise-picker-search")?.addEventListener("input",renderPicker);
+    $("#exercise-picker-create")?.addEventListener("click",createExercise);
+  });
+})();
+</script>
+
+
+<div id="workout-config" class="workout-config" hidden>
+  <div class="workout-config-backdrop" data-close-config></div>
+  <div class="workout-config-dialog">
+    <div class="exercise-picker-title">Configurar exercício no treino</div>
+    <div id="workout-config-exercise-name" class="workout-config-name"></div>
+
+    <label class="config-label">Número de séries
+      <input id="workout-config-series" class="library-search" type="number" min="1" step="1" placeholder="Ex.: 4">
+    </label>
+    <label class="config-label">Repetições
+      <input id="workout-config-reps" class="library-search" type="number" min="1" step="1" placeholder="Ex.: 10">
+    </label>
+    <label class="config-label">Carga
+      <input id="workout-config-load" class="library-search" type="number" min="0" step="0.1" placeholder="Ex.: 20">
+    </label>
+
+    <div id="workout-config-error" class="exercise-start-error" style="display:none"></div>
+    <button type="button" id="workout-config-save" class="complete-exercise">Adicionar ao treino</button>
+  </div>
+</div>
+
+
+<script>
+(function(){
+  let selectedExercise=null;
+
+  function q(s){return document.querySelector(s);}
+  function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
+  function openConfig(ex){
+    selectedExercise=ex;
+    q("#workout-config-exercise-name").textContent=ex.nome;
+    q("#workout-config-series").value=ex.series||"";
+    q("#workout-config-reps").value=ex.repeticoes||"";
+    q("#workout-config-load").value=ex.carga??"";
+    q("#workout-config-error").style.display="none";
+    q("#workout-config").hidden=false;
+  }
+
+  function closeConfig(){
+    q("#workout-config").hidden=true;
+    selectedExercise=null;
+  }
+
+  async function saveConfig(){
+    if(!selectedExercise)return;
+    const series=Number(q("#workout-config-series").value);
+    const reps=Number(q("#workout-config-reps").value);
+    const load=q("#workout-config-load").value.trim();
+    const err=q("#workout-config-error");
+
+    if(!series || series<1 || !reps || reps<1 || load===""){
+      err.textContent="Informe número de séries, repetições e carga antes de adicionar o exercício.";
+      err.style.display="block";
+      return;
+    }
+
+    await WorkoutExercise.save({
+      exerciseId:selectedExercise.id,
+      nome:selectedExercise.nome,
+      series:series,
+      repeticoes:reps,
+      carga:load,
+      descanso:90
+    });
+
+    // Mantém o cadastro original intacto; a configuração é exclusiva deste treino.
+    closeConfig();
+
+    // Integra com o formulário atual quando houver campos compatíveis.
+    const values=[
+      [["#exercise-name","#exercicio-nome",'[name="exercise-name"]','[name="exercicio"]'],selectedExercise.nome],
+      [["#exercise-series","#exercicio-series",'[name="series"]','[name="qtd-series"]'],series],
+      [["#exercise-reps","#exercicio-repeticoes",'[name="repeticoes"]','[name="reps"]'],reps],
+      [["#exercise-load","#exercicio-carga",'[name="carga"]','[name="load"]'],load]
+    ];
+    values.forEach(([selectors,value])=>{
+      const el=selectors.map(s=>document.querySelector(s)).find(Boolean);
+      if(el){el.value=value;el.dispatchEvent(new Event("input",{bubbles:true}));el.dispatchEvent(new Event("change",{bubbles:true}));}
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded",()=>{
+    document.addEventListener("click",async e=>{
+      const item=e.target.closest(".picker-item");
+      if(item){
+        const all=await ExerciseLibrary.list();
+        const ex=all.find(x=>String(x.id)===String(item.dataset.id));
+        if(ex){ e.preventDefault(); e.stopPropagation(); 
+          const picker=document.querySelector("#exercise-picker");
+          if(picker)picker.hidden=true;
+          openConfig(ex);
+        }
+      }
+      if(e.target.closest("[data-close-config]"))closeConfig();
+    });
+    q("#workout-config-save")?.addEventListener("click",saveConfig);
+  });
+})();
+</script>
+
 </body>
 </html>

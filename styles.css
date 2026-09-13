@@ -60,3 +60,41 @@ button:disabled{opacity:.45;cursor:not-allowed;transform:none!important}
   animation:restPulse .8s ease-in-out infinite alternate;
 }
 @keyframes restPulse{from{transform:scale(1)}to{transform:scale(1.04)}}
+
+/* Biblioteca de exercícios */
+.exercise-library-card{
+  margin:16px 0;
+  padding:16px;
+  border-radius:18px;
+  background:var(--card,#fff);
+  box-shadow:0 6px 24px rgba(0,0,0,.07);
+}
+.library-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.library-title{font-size:17px;font-weight:900}
+.library-subtitle{font-size:12px;opacity:.65;margin-top:3px}
+.library-refresh{border:0;border-radius:10px;padding:8px 11px;font-weight:800}
+.library-search{width:100%;box-sizing:border-box;margin-top:12px;padding:12px 14px;border-radius:12px;border:1px solid rgba(0,0,0,.12);font-size:15px}
+.library-list{display:flex;flex-direction:column;gap:7px;margin-top:12px}
+.library-item{display:flex;align-items:center;justify-content:space-between;width:100%;padding:13px 14px;border:0;border-radius:12px;text-align:left;font-weight:800;background:var(--soft,#f5f5f5)}
+.library-empty{padding:14px;text-align:center;opacity:.6}
+
+/* Seletor de exercícios */
+.exercise-picker[hidden]{display:none!important}
+.exercise-picker{position:fixed;inset:0;z-index:9999;display:flex;align-items:flex-end;justify-content:center}
+.exercise-picker-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.45)}
+.exercise-picker-dialog{position:relative;width:min(680px,100%);max-height:88vh;overflow:auto;background:var(--card,#fff);border-radius:24px 24px 0 0;padding:18px;box-sizing:border-box}
+.exercise-picker-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.exercise-picker-title{font-size:19px;font-weight:900}
+.exercise-picker-subtitle{font-size:12px;opacity:.65;margin-top:4px}
+.exercise-picker-close{border:0;background:transparent;font-size:28px;line-height:1;padding:2px 8px}
+.exercise-create-box{margin-top:18px;padding-top:16px;border-top:1px solid rgba(0,0,0,.10)}
+.picker-item{cursor:pointer}
+
+/* Configuração por treino */
+.workout-config[hidden]{display:none!important}
+.workout-config{position:fixed;inset:0;z-index:10000;display:flex;align-items:flex-end;justify-content:center}
+.workout-config-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.45)}
+.workout-config-dialog{position:relative;width:min(560px,100%);background:var(--card,#fff);border-radius:24px 24px 0 0;padding:18px;box-sizing:border-box}
+.workout-config-name{margin:7px 0 16px;font-size:18px;font-weight:900}
+.config-label{display:block;margin:10px 0;font-size:13px;font-weight:800}
+.config-label .library-search{margin-top:5px}

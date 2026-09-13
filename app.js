@@ -1,4 +1,128 @@
 
+/* =========================================================
+   BIBLIOTECA DE EXERCÍCIOS - IndexedDB
+   ========================================================= */
+const EX_DB_NAME = "PrjAcademiaDB";
+const EX_DB_VERSION = 2;
+const EX_STORE = "exercicios";
+const WORKOUT_STORE = "treino_exercicios";
+
+function openExerciseDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(EX_DB_NAME, EX_DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(EX_STORE)) {
+        const store = db.createObjectStore(EX_STORE, { keyPath: "id", autoIncrement: true });
+        store.createIndex("nome", "nome", { unique: false });
+        store.createIndex("ativo", "ativo", { unique: false });
+      }
+      if (!db.objectStoreNames.contains(WORKOUT_STORE)) {
+        const store = db.createObjectStore(WORKOUT_STORE, { keyPath: "id", autoIncrement: true });
+        store.createIndex("exerciseId", "exerciseId", { unique: false });
+        store.createIndex("treinoId", "treinoId", { unique: false });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function exerciseDBGetAll() {
+  const db = await openExerciseDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(EX_STORE, "readonly");
+    const req = tx.objectStore(EX_STORE).getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function exerciseDBSave(exercise) {
+  const db = await openExerciseDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(EX_STORE, "readwrite");
+    const store = tx.objectStore(EX_STORE);
+    const req = store.put({
+      ...exercise,
+      nome: String(exercise.nome || exercise.name || "").trim(),
+      ativo: exercise.ativo !== false,
+      atualizadoEm: new Date().toISOString()
+    });
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function exerciseDBSeedFromCurrentData() {
+  const existing = await exerciseDBGetAll();
+  if (existing.length) return existing;
+
+  // Tenta localizar arrays de exercícios já utilizados pelo aplicativo.
+  const candidates = [
+    window.exercises, window.exercicios, window.exerciseList,
+    window.workoutExercises, window.treinoExercicios
+  ];
+  let source = candidates.find(Array.isArray) || [];
+
+  const normalized = source.map((e, i) => {
+    if (typeof e === "string") return { nome: e, ativo: true };
+    return {
+      ...e,
+      nome: e.nome || e.name || e.titulo || `Exercício ${i + 1}`,
+      ativo: e.ativo !== false
+    };
+  }).filter(e => e.nome);
+
+  for (const e of normalized) await exerciseDBSave(e);
+
+  return exerciseDBGetAll();
+}
+
+async function exerciseLibrarySearch(term = "") {
+  const all = await exerciseDBGetAll();
+  const t = term.trim().toLowerCase();
+  return all
+    .filter(e => e.ativo !== false)
+    .filter(e => !t || String(e.nome).toLowerCase().includes(t))
+    .sort((a,b) => String(a.nome).localeCompare(String(b.nome), "pt-BR"));
+}
+
+async function salvarNovoExercicio(nome, dados = {}) {
+  const nomeLimpo = String(nome || "").trim();
+  if (!nomeLimpo) throw new Error("Informe o nome do exercício.");
+
+  const all = await exerciseDBGetAll();
+  const existente = all.find(e => String(e.nome).trim().toLowerCase() === nomeLimpo.toLowerCase());
+
+  if (existente) {
+    await exerciseDBSave({ ...existente, ...dados, nome: existente.nome });
+    return existente;
+  }
+
+  const id = await exerciseDBSave({
+    nome: nomeLimpo,
+    grupoMuscular: dados.grupoMuscular || dados.grupo || "",
+    equipamento: dados.equipamento || "",
+    ativo: true
+  });
+
+  return (await exerciseDBGetAll()).find(e => e.id === id);
+}
+
+window.ExerciseLibrary = {
+  list: exerciseDBGetAll,
+  search: exerciseLibrarySearch,
+  save: exerciseDBSave,
+  create: salvarNovoExercicio,
+  seed: exerciseDBSeedFromCurrentData
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+  exerciseDBSeedFromCurrentData().catch(err => console.warn("Biblioteca de exercícios:", err));
+});
+
+
 // === Regras de execução do treino ===
 const DEFAULT_REST_SECONDS = 90;
 let restAlertTriggered = false;
@@ -595,3 +719,132 @@ function clearData(){if(confirm("Apagar todo o histórico? Esta ação não pode
 
 if("serviceWorker" in navigator) window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js"));
 renderHome();
+
+
+/* =========================================================
+   INTEGRAÇÃO DA BIBLIOTECA COM "ADICIONAR EXERCÍCIO"
+   ========================================================= */
+(function(){
+  function getValue(id){
+    const el=document.getElementById(id);
+    return el ? el.value : "";
+  }
+
+  function findExerciseNameInput(){
+    return document.querySelector(
+      '#exercise-name, #exercicio-nome, [name="exercise-name"], [name="exercicio"], [name="nome-exercicio"]'
+    );
+  }
+
+  async function populateExerciseSuggestions(){
+    const input=findExerciseNameInput();
+    if(!input || !window.ExerciseLibrary) return;
+
+    let dl=document.getElementById("exercise-library-suggestions");
+    if(!dl){
+      dl=document.createElement("datalist");
+      dl.id="exercise-library-suggestions";
+      document.body.appendChild(dl);
+      input.setAttribute("list", dl.id);
+    }
+
+    const items=await ExerciseLibrary.search(input.value || "");
+    dl.innerHTML=items.map(e =>
+      '<option value="'+String(e.nome).replace(/"/g,'&quot;')+'"></option>'
+    ).join("");
+  }
+
+  async function saveExerciseFromForm(){
+    const input=findExerciseNameInput();
+    if(!input) return;
+
+    const nome=input.value.trim();
+    if(!nome) return;
+
+    const seriesEl=document.querySelector('#exercise-series, #exercicio-series, [name="series"], [name="qtd-series"]');
+    const loadEl=document.querySelector('#exercise-load, #exercicio-carga, [name="carga"], [name="load"]');
+    const repsEl=document.querySelector('#exercise-reps, #exercicio-repeticoes, [name="repeticoes"], [name="reps"]');
+
+    await ExerciseLibrary.create(nome, {
+      series: seriesEl ? seriesEl.value : "",
+      carga: loadEl ? loadEl.value : "",
+      repeticoes: repsEl ? repsEl.value : ""
+    });
+  }
+
+  function install(){
+    const input=findExerciseNameInput();
+    if(input){
+      input.addEventListener("input", populateExerciseSuggestions);
+      input.addEventListener("change", populateExerciseSuggestions);
+      populateExerciseSuggestions();
+    }
+
+    // Intercepta formulários que contenham o campo de nome de exercício.
+    document.querySelectorAll("form").forEach(form=>{
+      if(form.dataset.exerciseLibraryBound) return;
+      if(form.querySelector('#exercise-name, #exercicio-nome, [name="exercise-name"], [name="exercicio"], [name="nome-exercicio"]')){
+        form.dataset.exerciseLibraryBound="1";
+        form.addEventListener("submit", ()=>{ saveExerciseFromForm().catch(console.warn); });
+      }
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", install);
+  window.addEventListener("load", install);
+})();
+
+
+/* =========================================================
+   CONFIGURAÇÃO DO EXERCÍCIO NO TREINO
+   O cadastro da biblioteca não é alterado.
+   ========================================================= */
+async function workoutExerciseSave(config) {
+  const db = await openExerciseDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(WORKOUT_STORE,"readwrite");
+    const req=tx.objectStore(WORKOUT_STORE).put({
+      ...config,
+      series:Number(config.series)||0,
+      repeticoes:Number(config.repeticoes)||0,
+      carga:config.carga ?? "",
+      descanso:90,
+      atualizadoEm:new Date().toISOString()
+    });
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
+  });
+}
+
+async function workoutExerciseList(treinoId=null) {
+  const db=await openExerciseDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(WORKOUT_STORE,"readonly");
+    const store=tx.objectStore(WORKOUT_STORE);
+    const req=treinoId==null ? store.getAll() : store.index("treinoId").getAll(treinoId);
+    req.onsuccess=()=>resolve(req.result||[]);
+    req.onerror=()=>reject(req.error);
+  });
+}
+
+async function workoutExerciseUpdate(id, changes) {
+  const db=await openExerciseDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(WORKOUT_STORE,"readwrite");
+    const store=tx.objectStore(WORKOUT_STORE);
+    const get=store.get(id);
+    get.onsuccess=()=>{
+      if(!get.result){reject(new Error("Configuração do treino não encontrada."));return;}
+      const req=store.put({...get.result,...changes,atualizadoEm:new Date().toISOString()});
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    };
+    get.onerror=()=>reject(get.error);
+  });
+}
+
+window.WorkoutExercise = {
+  save: workoutExerciseSave,
+  list: workoutExerciseList,
+  update: workoutExerciseUpdate
+};
