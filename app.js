@@ -300,7 +300,7 @@ function viewTraining(code){
   const custom=db.customExercises?.[code] || [];
   const visibleCount=flatTraining(code).length;
   const totalCount=customized ? plan.length : t.sections.reduce((n,s)=>n+s.exercises.length,0)+custom.length;
-  const switchHtml=(id, enabled, name)=>`<label class="exercise-switch" title="${enabled?'Desativar':'Ativar'} ${esc(name)}"><input type="checkbox" ${enabled?'checked':''} onchange="toggleExercise(${JSON.stringify(code)},${JSON.stringify(id)},this.checked)" aria-label="${enabled?'Desativar':'Ativar'} ${esc(name)}"><span class="switch-slider"></span></label>`;
+  const switchHtml=(id, enabled, name)=>`<label class="exercise-switch" title="${enabled?'Desativar':'Ativar'} ${esc(name)}"><input type="checkbox" ${enabled?'checked':''} onchange="toggleExercise(${JSON.stringify(code)},${JSON.stringify(id)},this.checked)" aria-label="${enabled?'Desativar':'Ativar'} ${esc(name)}"><span class="switch-slider"></span><span class="switch-text">${enabled?'ON':'OFF'}</span></label>`;
   let sectionsHtml='';
   if(customized){
     const sections=[...new Set(plan.map(e=>e.section||'Outros'))];
