@@ -322,7 +322,7 @@ function startWorkout(code){
   stopIntervals();
   const ex=flatTraining(code);
   state.training=code; state.exerciseIndex=0; state.exerciseTimer=0; state.exerciseRunning=false; state.exerciseStartedAt=null; state.restTimer=0; state.restRunning=false;
-  state.workout={id:Date.now().toString(), type:code, date:todayISO(), startedAt:new Date().toISOString(), totalTime:0, exercises:ex.map(e=>({id:e.id,name:e.name,section:e.section,prescribedSets:e.sets,prescribedReps:e.reps,duration:0,sets:[]}))};
+  state.workout={id:Date.now().toString(), type:code, date:todayISO(), startedAt:new Date().toISOString(), totalTime:0, exercises:ex.map(e=>({id:e.id,name:e.name,section:e.section,prescribedSets:e.sets,prescribedReps:e.reps,duration:0,sets:[],completed:false}))};
   state.workoutTimerStart=Date.now();
   renderWorkout();
 }
@@ -333,7 +333,7 @@ function startExerciseTimer(){
   state.exerciseRunning=true;
   state.exerciseStartedAt=Date.now()-(state.exerciseTimer*1000);
   startMainTick();
-  renderWorkoutButtons();
+  renderWorkout();
 }
 function pauseExerciseTimer(){
   if(!state.exerciseRunning) return;
@@ -388,7 +388,7 @@ function renderWorkout(){
     <section class="rest-card"><div><span class="eyebrow">DESCANSO</span><b id="restTimer">${fmtShort(state.restRunning?state.restTimer:db.settings.rest)}</b></div><button class="secondary" onclick="${state.restRunning?'stopRest();renderWorkout()':'startRest()'}">${state.restRunning?'Parar':'Iniciar descanso'}</button></section>
     ${last&&last.sets?.length?`<div class="last-load">Último registro: ${last.sets.map(s=>(s.weight?s.weight+" kg":"sem carga")).join(" • ")}</div>`:""}
     <section class="sets-card"><div class="section-title">Séries e carga</div>${renderSets(e)}</section>
-    <div class="nav-ex"><button class="secondary" ${state.exerciseIndex===0?"disabled":""} onclick="prevExercise()">← Anterior</button><button class="primary" onclick="finishExercise()">${state.exerciseIndex===all.length-1?"Finalizar treino":"Próximo →"}</button></div>
+    <div class="nav-ex"><button class="secondary" ${state.exerciseIndex===0?"disabled":""} onclick="prevExercise()">← Anterior</button><button class="primary" ${e.completed?"":"disabled"} onclick="finishExercise()">${state.exerciseIndex===all.length-1?"Finalizar treino":"Próximo →"}</button></div>
   `);
   if(state.exerciseRunning) startMainTick();
   updateTimers();
@@ -405,18 +405,48 @@ function renderSets(e){
 function setValue(i,k,v){state.workout.exercises[state.exerciseIndex].sets[i][k]=v;}
 function toggleSet(i){state.workout.exercises[state.exerciseIndex].sets[i].done=!state.workout.exercises[state.exerciseIndex].sets[i].done; renderWorkout();}
 function addSet(){state.workout.exercises[state.exerciseIndex].sets.push({reps:"",weight:"",done:false});renderWorkout();}
+function allSetsCompleted(e){
+  const count=parseInt(e.prescribedSets)||0;
+  if(!count) return true;
+  while(e.sets.length<count) e.sets.push({reps:"",weight:"",done:false});
+  return e.sets.slice(0,count).every(s=>s.done);
+}
+function completeCurrentExercise(){
+  const e=currentExercise();
+  if(!allSetsCompleted(e)){
+    alert("Conclua todas as séries do exercício antes de continuar.");
+    return;
+  }
+  pauseExerciseTimer();
+  stopRest();
+  e.duration=Math.round(state.exerciseTimer);
+  e.completed=true;
+  state.exerciseTimer=0;
+  state.exerciseRunning=false;
+  state.exerciseStartedAt=null;
+  renderWorkout();
+}
 function finishExercise(){
+  const e=currentExercise();
+  if(!e.completed){
+    alert("Conclua o exercício e todas as séries antes de continuar.");
+    return;
+  }
   pauseExerciseTimer(); stopRest();
-  const e=currentExercise(); e.duration=Math.round(state.exerciseTimer);
-  if(state.exerciseIndex<state.workout.exercises.length-1){state.exerciseIndex++;state.exerciseTimer=0;state.exerciseRunning=false;state.exerciseStartedAt=null;renderWorkout();}
-  else finishWorkout();
+  if(state.exerciseIndex<state.workout.exercises.length-1){
+    state.exerciseIndex++;
+    state.exerciseTimer=0;
+    state.exerciseRunning=false;
+    state.exerciseStartedAt=null;
+    renderWorkout();
+  } else finishWorkout();
 }
 function prevExercise(){pauseExerciseTimer();stopRest();if(state.exerciseIndex>0)state.exerciseIndex--;state.exerciseTimer=state.workout.exercises[state.exerciseIndex].duration||0;state.exerciseRunning=false;state.exerciseStartedAt=null;renderWorkout();}
 function finishWorkout(){
   pauseExerciseTimer();stopRest();
   state.workout.totalTime=Math.round((Date.now()-state.workoutTimerStart)/1000);
   state.workout.endTime=new Date().toISOString();
-  state.workout.completedExercises=state.workout.exercises.filter(e=>e.duration>0 || e.sets.some(s=>s.done||s.reps||s.weight)).length;
+  state.workout.completedExercises=state.workout.exercises.filter(e=>e.completed).length;
   db.workouts.push(state.workout); save();
   const done=state.workout; state.workout=null;
   layout(`<section class="complete"><div class="complete-icon">✓</div><span class="eyebrow">TREINO FINALIZADO</span><h2>Excelente trabalho!</h2><p>Treino ${done.type} concluído em ${dateBR(done.date)}.</p>
