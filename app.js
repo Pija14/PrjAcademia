@@ -128,10 +128,13 @@ const DEFAULT_REST_SECONDS = 90;
 let restAlertTriggered = false;
 
 function exerciseReadyForStart(exercise) {
-  const series = Number(exercise?.series ?? exercise?.sets ?? exercise?.qtdSeries ?? 0);
-  const load = exercise?.carga ?? exercise?.load ?? exercise?.peso;
-  const hasLoad = load !== undefined && load !== null && String(load).trim() !== "" && Number(load) >= 0;
-  return series > 0 && hasLoad;
+  const series = Number(exercise?.series ?? exercise?.sets ?? exercise?.qtdSeries ?? parseInt(exercise?.prescribedSets));
+  const count = Number.isFinite(series) ? series : 0;
+  const sets = Array.isArray(exercise?.sets) ? exercise.sets : [];
+  const load = exercise?.carga ?? exercise?.load ?? exercise?.peso ?? exercise?.prescribedLoad;
+  const directLoad = load !== undefined && load !== null && String(load).trim() !== "";
+  const setLoad = sets.some(s => s && s.weight !== undefined && String(s.weight).trim() !== "");
+  return count > 0 && (directLoad || setLoad);
 }
 
 function notifyOneMinuteRest() {
@@ -251,7 +254,7 @@ const ALL_EXERCISES = Object.fromEntries(
 const KEY = "meuTreinoDataV1";
 const DEFAULTS = {
   workouts: [],
-  settings: {rest:90, sound:true, vibration:true, theme:"light"},
+  settings: {rest:30, sound:true, vibration:true, theme:"light"},
   excludedExercises: {A:[],B:[],C:[]},
   customExercises: {A:[],B:[],C:[]},
   workoutPlans: {A:null,B:null,C:null},
@@ -263,24 +266,15 @@ try {
 } catch(e) {
   db = JSON.parse(JSON.stringify(DEFAULTS));
 }
-if(!Array.isArray(db.workouts)) db.workouts=[];
-if(!db.settings || typeof db.settings!=="object") db.settings={rest:90,sound:true,vibration:true,theme:"light"};
-if(!db.settings.rest || Number(db.settings.rest)<1) db.settings.rest=90;
-if(!db.excludedExercises || typeof db.excludedExercises!=="object") db.excludedExercises={A:[],B:[],C:[]};
-if(!db.customExercises || typeof db.customExercises!=="object") db.customExercises={A:[],B:[],C:[]};
-if(!db.workoutPlans || typeof db.workoutPlans!=="object") db.workoutPlans={A:null,B:null,C:null};
-if(!db.workoutNames || typeof db.workoutNames!=="object") db.workoutNames={A:"Treino A",B:"Treino B",C:"Treino C"};
 if(!db.excludedExercises) db.excludedExercises = {A:[],B:[],C:[]};
 if(!db.customExercises) db.customExercises = {A:[],B:[],C:[]};
 if(!db.workoutPlans) db.workoutPlans = {A:null,B:null,C:null};
-if(!db.settings) db.settings={rest:90,sound:true,vibration:true,theme:"light"};
-if(!db.settings.rest || db.settings.rest===60) db.settings.rest=90;
 if(!db.workoutNames) db.workoutNames = {A:"Treino A",B:"Treino B",C:"Treino C"};
 ["A","B","C"].forEach(k=>{
   if(!Array.isArray(db.excludedExercises[k])) db.excludedExercises[k]=[];
   if(!Array.isArray(db.customExercises[k])) db.customExercises[k]=[];
 });
-let state = { page:"home", training:null, exerciseIndex:0, workout:null, exerciseTimer:0, exerciseRunning:false, exerciseStartedAt:null, currentSetIndex:0, restTimer:0, restRunning:false, timerInterval:null, restInterval:null };
+let state = { page:"home", training:null, exerciseIndex:0, workout:null, exerciseTimer:0, exerciseOneMinuteAlerted:false, exerciseRunning:false, exerciseStartedAt:null, currentSetIndex:0, restTimer:0, restRunning:false, timerInterval:null, restInterval:null };
 
 function save(){ localStorage.setItem(KEY, JSON.stringify(db)); }
 function pad(n){ return String(n).padStart(2,"0"); }
@@ -333,7 +327,7 @@ function editTraining(code){
         <small>${e.sets?esc(e.sets)+' séries':''}${e.reps?' • '+esc(e.reps):''}${en?'':' • desativado'}</small></div>
         <label class="exercise-switch" title="${en?'Desativar':'Ativar'} ${esc(e.name)}">
           <input type="checkbox" ${en?'checked':''}
-            onchange="toggleExercise(${JSON.stringify(code)},${JSON.stringify(e.id)},this.checked)"
+            onchange="setPlanEnabled('${code}',${JSON.stringify(e.id)},this.checked)"
             aria-label="${en?'Desativar':'Ativar'} ${esc(e.name)}">
           <span class="switch-slider"></span>
         </label>
@@ -346,10 +340,18 @@ function editTraining(code){
     <div class="detail-head"><span class="badge">${code}</span><div><h2>Editar ${esc(trainingName(code))}</h2><p>Ative ou desative os exercícios do treino.</p></div></div>
     ${sectionsHtml}
     <button class="add-exercise" onclick="openAddExercise('${code}',true)">＋ Adicionar exercício</button>
-    <button class="primary full" onclick="save(); viewTraining('${code}')">✓ Salvar treino</button>
+    <button class="primary full" onclick="saveTrainingCustomization('${code}')">✓ Salvar treino</button>
   `,"trainings");
 }
 
+function saveTrainingCustomization(code){
+  const input=document.getElementById("workoutNameEdit");
+  const name=input?.value.trim() || `Treino ${code}`;
+  db.workoutNames[code]=name;
+  if(!Array.isArray(db.workoutPlans?.[code])) ensureWorkoutPlan(code);
+  save();
+  viewTraining(code);
+}
 function openAddExercise(code, intoPlan=false){
   const groups = TRAININGS[code].sections.map(s=>s.name);
   layout(`<button class="back" onclick="${intoPlan?`editTraining('${code}')`:`viewTraining('${code}')`}">‹ Voltar</button>
@@ -393,7 +395,7 @@ function saveCustomExercise(code, intoPlan=false){
 }
 
 function viewTraining(code){
-  // Tela de apresentação: SOMENTE visualização. Sem switch e sem botão X.
+  // Tela de apresentação: sem switch e sem botão de remoção.
   const t=TRAININGS[code];
   const ex=flatTraining(code);
   const groups=[...new Set(ex.map(e=>e.section||"Outros"))];
@@ -408,9 +410,9 @@ function viewTraining(code){
   }).join("");
 
   layout(`<button class="back" onclick="go('trainings')">‹ Voltar</button>
-    <div class="detail-head"><span class="badge">${code}</span><div><h2>${esc(trainingName(code))}</h2><p>Apresentação do treino</p></div></div>
+    <div class="detail-head"><span class="badge">${code}</span><div><h2>${esc(trainingName(code))}</h2><p>Apresentação do treino • ${t.muscles.join(" • ")}</p></div></div>
     ${sectionsHtml || '<div class="empty big">Nenhum exercício ativo neste treino.</div>'}
-    <button class="primary full" onclick="startWorkout('${code}')">▶ Iniciar treino</button>
+    ${ex.length?`<button class="primary full" onclick="startWorkout('${code}')">▶ Iniciar treino</button>`:''}
     <button class="secondary full" onclick="editTraining('${code}')">✎ Editar treino</button>
   `,"trainings");
 }
@@ -422,15 +424,6 @@ function startWorkout(code){
   state.workout={id:Date.now().toString(), type:code, date:todayISO(), startedAt:new Date().toISOString(), totalTime:0, exercises:ex.map(e=>({id:e.id,name:e.name,section:e.section,prescribedSets:e.sets,prescribedReps:e.reps,duration:0,sets:[]}))};
   state.workoutTimerStart=Date.now();
   renderWorkout();
-}
-
-function persistWorkout(){
-  if(!state.workout) return;
-  const total=(Date.now()-(state.workoutTimerStart||Date.now()))/1000;
-  state.workout.totalTime=Math.round(total);
-  state.workout.completedExercises=(state.workout.exercises||[]).filter(e=>e.completed).length;
-  db.workouts.push(JSON.parse(JSON.stringify(state.workout)));
-  save();
 }
 
 function currentExercise(){ return state.workout.exercises[state.exerciseIndex]; }
@@ -455,106 +448,127 @@ function allSetsDone(e){
   return ex.sets.slice(0,count).every(s=>s.done);
 }
 function startExerciseTimer(){
-  if(state.restRunning) return;
-  if(allSetsDone(currentExercise())) return;
-  const idx=nextPendingSetIndex(currentExercise());
+  if(state.restRunning || state.exerciseRunning) return;
+  const e=currentExercise();
+  if(!exerciseReadyForStart(e)){
+    alert("Informe o número de séries e a carga antes de iniciar o exercício.");
+    return;
+  }
+  if(allSetsDone(e)) return;
+
+  const idx=nextPendingSetIndex(e);
   if(idx>=0) state.currentSetIndex=idx;
-  if(state.exerciseRunning) return;
+
+  state.exerciseTimer=0;
+  state.exerciseOneMinuteAlerted=false;
   state.exerciseRunning=true;
-  state.exerciseStartedAt=Date.now()-(state.exerciseTimer*1000);
+  state.exerciseStartedAt=Date.now();
   startMainTick();
   renderWorkout();
 }
+
 function pauseExerciseTimer(){
-  if(!state.exerciseRunning) return;
-  state.exerciseTimer=(Date.now()-state.exerciseStartedAt)/1000;
-  state.exerciseRunning=false;
-  state.exerciseStartedAt=null;
-  if(state.timerInterval){clearInterval(state.timerInterval);state.timerInterval=null;}
-  updateTimers();
+  // Não existe pausa durante a série: ela dura exatamente 60 segundos.
+  return;
 }
-function completeExercise(){
-  const e=currentExercise();
-  if(!allSetsDone(e)) return;
-  pauseExerciseTimer();
-  stopRest();
-  e.duration=Math.round(state.exerciseTimer);
-  e.completed=true;
-  state.exerciseTimer=0;
-  state.exerciseStartedAt=null;
-  renderWorkout();
-}
+
 function startMainTick(){
   if(state.timerInterval) clearInterval(state.timerInterval);
   state.timerInterval=setInterval(()=>{
-    if(state.exerciseRunning && state.exerciseStartedAt) state.exerciseTimer=(Date.now()-state.exerciseStartedAt)/1000;
+    if(state.exerciseRunning && state.exerciseStartedAt){
+      state.exerciseTimer=(Date.now()-state.exerciseStartedAt)/1000;
+
+      // A série dura exatamente 60 segundos.
+      if(state.exerciseTimer>=60){
+        state.exerciseTimer=60;
+        state.exerciseRunning=false;
+        state.exerciseStartedAt=null;
+        if(state.timerInterval){
+          clearInterval(state.timerInterval);
+          state.timerInterval=null;
+        }
+
+        // Apita/vibra aos 60s e inicia automaticamente os 30s de descanso.
+        if(navigator.vibrate && db.settings.vibration) navigator.vibrate([250,120,250,120,250]);
+        beep();
+        startRest();
+        return;
+      }
+    }
     updateTimers();
-  },250);
+  },100);
 }
+
 function startRest(){
   if(state.restRunning) return;
+
   const e=currentExercise();
-  // O descanso encerra a contagem da série atual.
-  if(state.exerciseRunning) pauseExerciseTimer();
   const count=exerciseSetCount(e);
-  if(count){
-    const ex=state.workout.exercises[state.exerciseIndex];
-    while(ex.sets.length<count) ex.sets.push({reps:"",weight:"",done:false});
-    const idx=Math.min(state.currentSetIndex,count-1);
-    ex.sets[idx].done=true;
-    state.currentSetIndex=idx+1;
-  }
+  if(!count) return;
+
+  const ex=state.workout.exercises[state.exerciseIndex];
+  while(ex.sets.length<count) ex.sets.push({reps:"",weight:"",done:false});
+
   state.restRunning=true;
-  state.restTimer=Number(db.settings.rest)||60;
+  state.restTimer=30;
+
   if(state.restInterval) clearInterval(state.restInterval);
   state.restInterval=setInterval(()=>{
-    state.restTimer-=1; updateTimers();
+    state.restTimer-=1;
+    updateTimers();
+
+    // Após exatamente 30s, a série é concluída.
     if(state.restTimer<=0){
-      finishRestAndStartNextSet();
-      if(navigator.vibrate && db.settings.vibration) navigator.vibrate([250,120,250]);
-      beep();
+      finishRestAndEnableNextSeries();
     }
   },1000);
+
   renderWorkout();
 }
-function finishRestAndStartNextSet(){
-  stopRest();
-  const e=currentExercise();
-  const idx=nextPendingSetIndex(e);
-  if(idx>=0){
-    state.currentSetIndex=idx;
-    state.exerciseTimer=0;
-    state.exerciseStartedAt=null;
-    startExerciseTimer();
-  } else {
-    state.exerciseTimer=0;
-    state.exerciseStartedAt=null;
-    renderWorkout();
-  }
-}
-function stopRest(){
+
+function finishRestAndEnableNextSeries(){
   if(!state.restRunning) return;
-  if(state.restInterval){clearInterval(state.restInterval);state.restInterval=null;}
-  state.restRunning=false;
-  // Ao parar o descanso, inicia automaticamente a próxima série, se houver.
-  const e=currentExercise();
-  const idx=nextPendingSetIndex(e);
-  if(idx>=0){
-    state.currentSetIndex=idx;
-    state.exerciseTimer=0;
-    state.exerciseStartedAt=null;
-    startExerciseTimer();
-  } else {
-    state.exerciseTimer=0;
-    state.exerciseStartedAt=null;
-    renderWorkout();
+
+  if(state.restInterval){
+    clearInterval(state.restInterval);
+    state.restInterval=null;
   }
+
+  state.restRunning=false;
+  state.restTimer=0;
+
+  const e=currentExercise();
+  const count=exerciseSetCount(e);
+  const ex=state.workout.exercises[state.exerciseIndex];
+
+  // Só agora a série atual é considerada concluída.
+  const idx=Math.min(state.currentSetIndex,count-1);
+  ex.sets[idx].done=true;
+  state.currentSetIndex=idx+1;
+
+  // Apita/vibra quando o descanso terminar.
+  if(navigator.vibrate && db.settings.vibration) navigator.vibrate([250,120,250]);
+  beep();
+
+  // NÃO inicia a próxima série automaticamente.
+  // Apenas libera o botão "Iniciar próxima série".
+  state.exerciseTimer=0;
+  state.exerciseStartedAt=null;
+  state.exerciseOneMinuteAlerted=false;
+  e.completed=allSetsDone(e);
+  renderWorkout();
 }
+
+function stopRest(){
+  // O descanso é obrigatório e não pode ser interrompido.
+  return;
+}
+
 function stopIntervals(){if(state.timerInterval)clearInterval(state.timerInterval);if(state.restInterval)clearInterval(state.restInterval);state.timerInterval=null;state.restInterval=null;state.exerciseRunning=false;state.restRunning=false;}
 function beep(){if(!db.settings.sound)return;try{const c=new(window.AudioContext||window.webkitAudioContext)();const o=c.createOscillator();const g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.05;o.start();o.stop(c.currentTime+.18);}catch(e){}}
 function updateTimers(){
   const a=document.getElementById('exerciseTimer'); if(a)a.textContent=fmt(state.exerciseTimer);
-  const b=document.getElementById('restTimer'); if(b)b.textContent=fmtShort(state.restRunning?state.restTimer:(Number(db.settings.rest)||60));
+  const b=document.getElementById('restTimer'); if(b)b.textContent=fmtShort(state.restRunning?state.restTimer:30);
   const c=document.getElementById('workoutTimer'); if(c&&state.workoutTimerStart)c.textContent=fmt((Date.now()-state.workoutTimerStart)/1000);
 }
 
@@ -573,11 +587,14 @@ function renderWorkout(){
     <section class="focus-card"><span class="eyebrow">${esc(e.section)}</span><h2>${esc(e.name)}</h2><div class="prescription">${e.prescribedSets||"Séries não informadas"} ${e.prescribedSets ? '<span>×</span> ' : ''}${e.prescribedReps||""}</div>
       <div class="set-status">${setLabel} • ${doneSets}${count?' de '+count:''} concluída(s)</div>
       <div class="big-timer" id="exerciseTimer">${fmt(state.exerciseTimer)}</div>
-      <div class="timer-actions"><button class="timer-start" onclick="${state.exerciseRunning?'pauseExerciseTimer()':'startExerciseTimer()'}" ${complete||state.restRunning?'disabled':''}>${state.exerciseRunning?'⏸ Pausar':'▶ Iniciar'}</button><button class="secondary" onclick="resetExerciseTimer()" ${state.restRunning?'disabled':''}>↺ Zerar</button></div>
-      ${state.exerciseRunning?`<button class="complete-exercise" onclick="completeExercise()" ${complete?'':'disabled'}>✓ Concluir exercício</button>`:''}
+      <div class="timer-actions">
+        <button class="timer-start" onclick="startExerciseTimer()" ${state.exerciseRunning||state.restRunning||complete?'disabled':''}>
+          ${state.restRunning?'Descansando…':(doneSets>0?'▶ Iniciar próxima série':'▶ Iniciar série')}
+        </button>
+      </div>
       ${complete?`<div class="exercise-completed">✓ Exercício concluído</div>`:''}
     </section>
-    <section class="rest-card"><div><span class="eyebrow">DESCANSO</span><b id="restTimer">${fmtShort(state.restRunning?state.restTimer:db.settings.rest)}</b></div><button class="secondary" onclick="${state.restRunning?'stopRest()':'startRest()'}" ${complete?'disabled':''}>${state.restRunning?'Parar':'Iniciar descanso'}</button></section>
+    <section class="rest-card"><div><span class="eyebrow">DESCANSO</span><b id="restTimer">${fmtShort(state.restRunning?state.restTimer:30)}</b></div><button class="secondary" onclick="${state.restRunning?'stopRest()':'startRest()'}" ${complete?'disabled':''}>${state.restRunning?'Parar':'Iniciar descanso'}</button></section>
     ${last&&last.sets?.length?`<div class="last-load">Último registro: ${last.sets.map(s=>(s.weight?s.weight+" kg":"sem carga")).join(" • ")}</div>`:""}
     <section class="sets-card"><div class="section-title">Séries e carga</div>${renderSets(e)}</section>
     <div class="nav-ex"><button class="secondary" ${state.exerciseIndex===0?"disabled":""} onclick="prevExercise()">← Anterior</button><button class="primary" ${canNext?'':'disabled'} onclick="finishExercise()">${state.exerciseIndex===all.length-1?"Finalizar treino":"Próximo →"}</button></div>
@@ -591,14 +608,12 @@ function renderSets(e){
   if(!count)return `<div class="empty">A ficha original não informa a quantidade de séries deste exercício. Registre livremente:</div><div class="manual-set"><input type="number" min="0" placeholder="Reps"><input type="number" min="0" step=".5" placeholder="kg"><button onclick="addSet()">+</button></div>`;
   const ex=state.workout.exercises[state.exerciseIndex];
   while(ex.sets.length<count) ex.sets.push({reps:"",weight:"",done:false});
-  return ex.sets.map((s,i)=>`<div class="set-row"><span class="setnum">${i+1}</span><input value="${esc(s.reps)}" placeholder="${e.prescribedReps?.split("/")[i]||"reps"}" onchange="setValue(${i},'reps',this.value)"><input value="${esc(s.weight)}" placeholder="kg" inputmode="decimal" onchange="setValue(${i},'weight',this.value)"><button class="check ${s.done?'done':''}" onclick="toggleSet(${i})">${s.done?'✓':'○'}</button></div>`).join("");
+  return ex.sets.map((s,i)=>`<div class="set-row"><span class="setnum">${i+1}</span><input value="${esc(s.reps)}" placeholder="${e.prescribedReps?.split("/")[i]||"reps"}" onchange="setValue(${i},'reps',this.value)"><input value="${esc(s.weight)}" placeholder="kg" inputmode="decimal" onchange="setValue(${i},'weight',this.value)"><span class="check ${s.done?'done':''}">${s.done?'✓':'○'}</span></div>`).join("");
 }
 function setValue(i,k,v){state.workout.exercises[state.exerciseIndex].sets[i][k]=v;}
 function toggleSet(i){const ex=state.workout.exercises[state.exerciseIndex]; ex.sets[i].done=!ex.sets[i].done; if(ex.sets[i].done && i===state.currentSetIndex) state.currentSetIndex=i+1; if(!ex.sets[i].done) state.currentSetIndex=Math.min(state.currentSetIndex,i); renderWorkout();}
 function addSet(){state.workout.exercises[state.exerciseIndex].sets.push({reps:"",weight:"",done:false});renderWorkout();}
 function finishExercise(){
-  if(!state.workout) return;
-
   const e=currentExercise();
   if(!allSetsDone(e)) return;
   pauseExerciseTimer(); stopRest();
@@ -654,7 +669,7 @@ function renderHistory(){
 
 function openSettings(){
   layout(`<button class="back" onclick="go('home')">‹ Voltar</button><h2>Configurações</h2>
-    <section class="settings-card"><label>Descanso padrão <select onchange="db.settings.rest=+this.value;save()">${[30,45,60,90,120].map(x=>`<option value="${x}" ${db.settings.rest===x?'selected':''}>${x} segundos</option>`).join("")}</select></label>
+    <section class="settings-card"><label>Descanso padrão <select onchange="90=+this.value;save()">${[30,45,60,90,120].map(x=>`<option value="${x}" ${90===x?'selected':''}>${x} segundos</option>`).join("")}</select></label>
     <label class="switch">Vibração <input type="checkbox" ${db.settings.vibration?'checked':''} onchange="db.settings.vibration=this.checked;save()"></label>
     <label class="switch">Som <input type="checkbox" ${db.settings.sound?'checked':''} onchange="db.settings.sound=this.checked;save()"></label>
     </section>
