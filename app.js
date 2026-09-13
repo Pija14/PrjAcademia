@@ -92,8 +92,19 @@ const ALL_EXERCISES = Object.fromEntries(
 );
 
 const KEY = "meuTreinoDataV1";
-const DEFAULTS = { workouts: [], settings: {rest:60, sound:true, vibration:true, theme:"light"} };
+const DEFAULTS = {
+  workouts: [],
+  settings: {rest:60, sound:true, vibration:true, theme:"light"},
+  excludedExercises: {A:[],B:[],C:[]},
+  customExercises: {A:[],B:[],C:[]}
+};
 let db = JSON.parse(localStorage.getItem(KEY) || "null") || DEFAULTS;
+if(!db.excludedExercises) db.excludedExercises = {A:[],B:[],C:[]};
+if(!db.customExercises) db.customExercises = {A:[],B:[],C:[]};
+["A","B","C"].forEach(k=>{
+  if(!Array.isArray(db.excludedExercises[k])) db.excludedExercises[k]=[];
+  if(!Array.isArray(db.customExercises[k])) db.customExercises[k]=[];
+});
 let state = { page:"home", training:null, exerciseIndex:0, workout:null, exerciseTimer:0, exerciseRunning:false, exerciseStartedAt:null, restTimer:0, restRunning:false, timerInterval:null, restInterval:null };
 
 function save(){ localStorage.setItem(KEY, JSON.stringify(db)); }
@@ -101,7 +112,16 @@ function pad(n){ return String(n).padStart(2,"0"); }
 function fmt(sec){ sec=Math.max(0,Math.floor(sec)); return `${pad(Math.floor(sec/3600))}:${pad(Math.floor(sec%3600/60))}:${pad(sec%60)}`; }
 function fmtShort(sec){ sec=Math.max(0,Math.floor(sec)); return `${pad(Math.floor(sec/60))}:${pad(sec%60)}`; }
 function esc(s){ return String(s).replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m])); }
-function flatTraining(code){ return TRAININGS[code].sections.flatMap(s=>s.exercises.map((e,i)=>({id:`${code}-${s.name}-${i}`, section:s.name, name:e[0], sets:e[1], reps:e[2]}))); }
+function flatTraining(code){
+  const excluded = new Set(db.excludedExercises?.[code] || []);
+  const base = TRAININGS[code].sections.flatMap(s=>s.exercises.map((e,i)=>({
+    id:`${code}-${s.name}-${i}`, section:s.name, name:e[0], sets:e[1], reps:e[2]
+  })));
+  const custom = (db.customExercises?.[code] || []).map(e=>({
+    id:e.id, section:e.section || "Outros", name:e.name, sets:e.sets || "", reps:e.reps || "", custom:true
+  }));
+  return [...base, ...custom].filter(e=>!excluded.has(e.id));
+}
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 function dateBR(iso){ if(!iso)return ""; const [y,m,d]=iso.split("-"); return `${d}/${m}/${y}`; }
 function totalExercises(code){ return flatTraining(code).length; }
@@ -146,55 +166,194 @@ function renderTrainings(){
     <div class="list">${["A","B","C"].map(c=>`<button class="list-card" onclick="viewTraining('${c}')"><span class="badge">${c}</span><div><b>${TRAININGS[c].name}</b><small>${TRAININGS[c].muscles.join(" • ")}</small></div><span>›</span></button>`).join("")}</div>`,"trainings");
 }
 
+function exerciseId(code, section, index){ return `${code}-${section}-${index}`; }
+
+function deleteExercise(code, section, index){
+  const id = exerciseId(code, section, index);
+  const exercise = TRAININGS[code].sections.find(s=>s.name===section)?.exercises[index];
+  if(!exercise) return;
+  if(!confirm(`Excluir "${exercise[0]}" do Treino ${code}?`)) return;
+  if(!db.excludedExercises[code]) db.excludedExercises[code]=[];
+  if(!db.excludedExercises[code].includes(id)) db.excludedExercises[code].push(id);
+  save();
+  viewTraining(code);
+}
+
+function restoreExercise(code, id, name){
+  const list = db.excludedExercises[code] || [];
+  db.excludedExercises[code] = list.filter(x=>x !== id);
+  save();
+  viewTraining(code);
+}
+
+function restoreExercises(code){
+  if(!db.excludedExercises?.[code]?.length){
+    alert("Não há exercícios excluídos neste treino.");
+    return;
+  }
+  if(confirm(`Restaurar todos os exercícios excluídos do Treino ${code}?`)){
+    db.excludedExercises[code]=[];
+    save();
+    viewTraining(code);
+  }
+}
+
+function openAddExercise(code){
+  const groups = TRAININGS[code].sections.map(s=>s.name);
+  layout(`<button class="back" onclick="viewTraining('${code}')">‹ Voltar</button>
+    <div class="detail-head"><span class="badge">${code}</span><div><h2>Adicionar exercício</h2><p>Personalize seu Treino ${code}</p></div></div>
+    <form class="exercise-form" onsubmit="event.preventDefault(); saveCustomExercise('${code}')">
+      <label>Nome do exercício
+        <input id="newExerciseName" required maxlength="80" placeholder="Ex.: Rosca direta">
+      </label>
+      <label>Grupo muscular
+        <select id="newExerciseSection">
+          ${groups.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join("")}
+          <option value="Outros">Outros</option>
+        </select>
+      </label>
+      <div class="form-grid">
+        <label>Séries
+          <input id="newExerciseSets" inputmode="numeric" maxlength="10" placeholder="Ex.: 4">
+        </label>
+        <label>Repetições / tempo
+          <input id="newExerciseReps" maxlength="30" placeholder="Ex.: 10 ou 45s">
+        </label>
+      </div>
+      <p class="form-hint">Você pode deixar séries e repetições em branco e preencher durante o treino.</p>
+      <button class="primary full" type="submit">✓ Salvar exercício</button>
+      <button class="secondary full" type="button" onclick="viewTraining('${code}')">Cancelar</button>
+    </form>`);
+  setTimeout(()=>document.getElementById("newExerciseName")?.focus(),50);
+}
+
+function saveCustomExercise(code){
+  const name=document.getElementById("newExerciseName")?.value.trim();
+  const section=document.getElementById("newExerciseSection")?.value.trim() || "Outros";
+  const sets=document.getElementById("newExerciseSets")?.value.trim() || "";
+  const reps=document.getElementById("newExerciseReps")?.value.trim() || "";
+  if(!name){ alert("Informe o nome do exercício."); return; }
+  db.customExercises[code].push({
+    id:`custom-${code}-${Date.now()}`,
+    name, section, sets, reps
+  });
+  save();
+  viewTraining(code);
+}
+
+function deleteCustomExercise(code, id, name){
+  if(!confirm(`Excluir definitivamente "${name}"?`)) return;
+  db.customExercises[code] = (db.customExercises[code]||[]).filter(e=>e.id!==id);
+  save();
+  viewTraining(code);
+}
+
 function viewTraining(code){
   const t=TRAININGS[code];
-  layout(`<button class="back" onclick="go('trainings')">‹ Voltar</button><div class="detail-head"><span class="badge">${code}</span><div><h2>${t.name}</h2><p>${t.muscles.join(" • ")}</p></div></div>
-    ${t.sections.map(s=>`<section class="section"><div class="section-title">${s.name}</div>${s.exercises.map((e,i)=>`<div class="exercise-row"><div><b>${i+1}. ${esc(e[0])}</b><small>${e[1]?e[1]+" séries":"Séries não informadas"}${e[2]?" • "+e[2]:""}</small></div><span>›</span></div>`).join("")}</section>`).join("")}
-    <button class="primary full" onclick="startWorkout('${code}')">▶ Iniciar ${t.name}</button>`);
+  const excluded=new Set(db.excludedExercises?.[code] || []);
+  const custom=db.customExercises?.[code] || [];
+  const visibleCount=flatTraining(code).length;
+
+  const sections = t.sections.map(s=>{
+    const rows=s.exercises.map((e,i)=>{
+      const id=exerciseId(code,s.name,i);
+      if(excluded.has(id)) return "";
+      return `<div class="exercise-row">
+        <div><b>${i+1}. ${esc(e[0])}</b><small>${e[1]?e[1]+" séries":"Séries não informadas"}${e[2]?" • "+e[2]:""}</small></div>
+        <button class="delete-exercise" onclick="deleteExercise('${code}',${JSON.stringify(s.name)},${i})" title="Excluir exercício" aria-label="Excluir ${esc(e[0])}">✕</button>
+      </div>`;
+    }).join("");
+    return rows ? `<section class="section"><div class="section-title">${s.name}</div>${rows}</section>` : "";
+  }).join("");
+
+  const customRows = custom.map(e=>`
+    <div class="exercise-row">
+      <div><b>+ ${esc(e.name)}</b><small>${esc(e.section)}${e.sets?` • ${esc(e.sets)} séries`:""}${e.reps?` • ${esc(e.reps)}`:""}</small></div>
+      <button class="delete-exercise" onclick="deleteCustomExercise('${code}',${JSON.stringify(e.id)},${JSON.stringify(e.name)})" title="Excluir exercício personalizado">✕</button>
+    </div>`).join("");
+
+  const excludedRows = t.sections.flatMap(s=>s.exercises.map((e,i)=>{
+    const id=exerciseId(code,s.name,i);
+    return excluded.has(id) ? `<div class="exercise-row excluded-row">
+      <div><b>${esc(e[0])}</b><small>${s.name} • excluído</small></div>
+      <button class="restore-exercise" onclick="restoreExercise('${code}',${JSON.stringify(id)},${JSON.stringify(e[0])})">↺ Restaurar</button>
+    </div>` : "";
+  })).join("");
+
+  layout(`<button class="back" onclick="go('trainings')">‹ Voltar</button>
+    <div class="detail-head"><span class="badge">${code}</span><div><h2>${t.name}</h2><p>${t.muscles.join(" • ")}</p></div></div>
+
+    <div class="training-tools">
+      <span>${visibleCount} exercício(s) ativo(s)</span>
+      ${excluded.size?`<button class="secondary compact" onclick="restoreExercises('${code}')">↺ Restaurar todos</button>`:""}
+    </div>
+
+    ${sections}
+    ${customRows?`<section class="section"><div class="section-title">Meus exercícios</div>${customRows}</section>`:""}
+
+    <button class="add-exercise" onclick="openAddExercise('${code}')">＋ Adicionar exercício manualmente</button>
+
+    ${excludedRows?`<section class="section excluded-section"><div class="section-title">Exercícios excluídos</div>${excludedRows}</section>`:""}
+
+    ${visibleCount?`<button class="primary full" onclick="startWorkout('${code}')">▶ Iniciar ${t.name}</button>`:`<div class="empty big">Este treino está sem exercícios ativos. Restaure ou adicione um exercício.</div>`}`);
 }
 
 function startWorkout(code){
   stopIntervals();
   const ex=flatTraining(code);
-  state.training=code; state.exerciseIndex=0; state.exerciseTimer=0; state.exerciseRunning=false; state.restTimer=0;
-  state.workout={id:Date.now().toString(), type:code, date:todayISO(), startedAt:new Date().toISOString(), totalTime:0, exercises:ex.map(e=>({id:e.id,name:e.name,section:e.section,duration:0,sets:[]}))};
+  state.training=code; state.exerciseIndex=0; state.exerciseTimer=0; state.exerciseRunning=false; state.exerciseStartedAt=null; state.restTimer=0; state.restRunning=false;
+  state.workout={id:Date.now().toString(), type:code, date:todayISO(), startedAt:new Date().toISOString(), totalTime:0, exercises:ex.map(e=>({id:e.id,name:e.name,section:e.section,prescribedSets:e.sets,prescribedReps:e.reps,duration:0,sets:[]}))};
   state.workoutTimerStart=Date.now();
   renderWorkout();
 }
 
 function currentExercise(){ return state.workout.exercises[state.exerciseIndex]; }
 function startExerciseTimer(){
-  if(state.exerciseRunning)return;
+  if(state.exerciseRunning) return;
   state.exerciseRunning=true;
-  state.exerciseStartedAt=Date.now()-state.exerciseTimer*1000;
-  state.timerInterval=setInterval(()=>{
-    state.exerciseTimer=(Date.now()-state.exerciseStartedAt)/1000;
-    updateTimers();
-  },250);
+  state.exerciseStartedAt=Date.now()-(state.exerciseTimer*1000);
+  startMainTick();
   renderWorkoutButtons();
 }
 function pauseExerciseTimer(){
-  state.exerciseRunning=false; if(state.timerInterval)clearInterval(state.timerInterval); state.timerInterval=null;
-  if(state.exerciseStartedAt) state.exerciseTimer=(Date.now()-state.exerciseStartedAt)/1000;
+  if(!state.exerciseRunning) return;
+  state.exerciseTimer=(Date.now()-state.exerciseStartedAt)/1000;
+  state.exerciseRunning=false;
+  state.exerciseStartedAt=null;
+  if(state.timerInterval){clearInterval(state.timerInterval);state.timerInterval=null;}
+  updateTimers();
   renderWorkoutButtons();
 }
+function startMainTick(){
+  if(state.timerInterval) clearInterval(state.timerInterval);
+  state.timerInterval=setInterval(()=>{
+    if(state.exerciseRunning && state.exerciseStartedAt) state.exerciseTimer=(Date.now()-state.exerciseStartedAt)/1000;
+    updateTimers();
+  },250);
+}
 function startRest(){
-  if(state.restRunning)return;
-  state.restRunning=true; state.restTimer=db.settings.rest;
+  if(state.restRunning) return;
+  state.restRunning=true; state.restTimer=Number(db.settings.rest)||60;
+  if(state.restInterval) clearInterval(state.restInterval);
   state.restInterval=setInterval(()=>{
     state.restTimer-=1; updateTimers();
-    if(state.restTimer<=0){ clearInterval(state.restInterval); state.restInterval=null; state.restRunning=false; if(navigator.vibrate && db.settings.vibration)navigator.vibrate([250,120,250]); beep(); renderWorkout(); }
+    if(state.restTimer<=0){
+      clearInterval(state.restInterval); state.restInterval=null; state.restRunning=false;
+      if(navigator.vibrate && db.settings.vibration) navigator.vibrate([250,120,250]);
+      beep(); renderWorkout();
+    }
   },1000);
   renderWorkout();
 }
-function stopRest(){ state.restRunning=false; if(state.restInterval)clearInterval(state.restInterval); state.restInterval=null; }
-function stopIntervals(){ if(state.timerInterval)clearInterval(state.timerInterval); if(state.restInterval)clearInterval(state.restInterval); state.timerInterval=null; state.restInterval=null; }
-function beep(){ if(!db.settings.sound)return; try{const c=new (window.AudioContext||window.webkitAudioContext)(); const o=c.createOscillator(); const g=c.createGain(); o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.05;o.start();o.stop(c.currentTime+.18);}catch(e){} }
+function stopRest(){state.restRunning=false;if(state.restInterval){clearInterval(state.restInterval);state.restInterval=null;}}
+function stopIntervals(){if(state.timerInterval)clearInterval(state.timerInterval);if(state.restInterval)clearInterval(state.restInterval);state.timerInterval=null;state.restInterval=null;}
+function beep(){if(!db.settings.sound)return;try{const c=new(window.AudioContext||window.webkitAudioContext)();const o=c.createOscillator();const g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.05;o.start();o.stop(c.currentTime+.18);}catch(e){}}
 function updateTimers(){
-  const a=document.getElementById("exerciseTimer"); if(a)a.textContent=fmt(state.exerciseTimer);
-  const b=document.getElementById("restTimer"); if(b)b.textContent=fmtShort(state.restTimer);
-  const c=document.getElementById("workoutTimer"); if(c)c.textContent=fmt((Date.now()-state.workoutTimerStart)/1000);
+  const a=document.getElementById('exerciseTimer'); if(a)a.textContent=fmt(state.exerciseTimer);
+  const b=document.getElementById('restTimer'); if(b)b.textContent=fmtShort(state.restRunning?state.restTimer:(Number(db.settings.rest)||60));
+  const c=document.getElementById('workoutTimer'); if(c&&state.workoutTimerStart)c.textContent=fmt((Date.now()-state.workoutTimerStart)/1000);
 }
+
 function renderWorkout(){
   const e=currentExercise(), all=state.workout.exercises, progress=Math.round(((state.exerciseIndex+1)/all.length)*100);
   const last=db.workouts.flatMap(w=>w.exercises||[]).findLast?.(x=>x.name===e.name) || null;
@@ -202,7 +361,7 @@ function renderWorkout(){
     <div class="workout-header"><button class="back" onclick="confirmExitWorkout()">‹ Sair</button><span class="pill">TREINO ${state.training}</span></div>
     <div class="workout-progress"><div style="width:${progress}%"></div></div>
     <div class="workout-meta"><span>Exercício ${state.exerciseIndex+1} de ${all.length}</span><b id="workoutTimer">${fmt((Date.now()-state.workoutTimerStart)/1000)}</b></div>
-    <section class="focus-card"><span class="eyebrow">${esc(e.section)}</span><h2>${esc(e.name)}</h2><div class="prescription">${e.sets||"—"} <span>×</span> ${e.reps||"repetições"}</div>
+    <section class="focus-card"><span class="eyebrow">${esc(e.section)}</span><h2>${esc(e.name)}</h2><div class="prescription">${e.prescribedSets||"Séries não informadas"} ${e.prescribedSets ? '<span>×</span> ' : ''}${e.prescribedReps||""}</div>
       <div class="big-timer" id="exerciseTimer">${fmt(state.exerciseTimer)}</div>
       <div class="timer-actions"><button class="timer-start" onclick="${state.exerciseRunning?'pauseExerciseTimer()':'startExerciseTimer()'}">${state.exerciseRunning?'⏸ Pausar':'▶ Iniciar'}</button><button class="secondary" onclick="resetExerciseTimer()">↺ Zerar</button></div>
     </section>
@@ -211,16 +370,17 @@ function renderWorkout(){
     <section class="sets-card"><div class="section-title">Séries e carga</div>${renderSets(e)}</section>
     <div class="nav-ex"><button class="secondary" ${state.exerciseIndex===0?"disabled":""} onclick="prevExercise()">← Anterior</button><button class="primary" onclick="finishExercise()">${state.exerciseIndex===all.length-1?"Finalizar treino":"Próximo →"}</button></div>
   `);
-  if(state.exerciseRunning || state.restRunning) { clearInterval(state.timerInterval); clearInterval(state.restInterval); if(state.exerciseRunning) startExerciseTimer(); if(state.restRunning){state.restRunning=false;startRest();} }
+  if(state.exerciseRunning) startMainTick();
+  updateTimers();
 }
-function renderWorkoutButtons(){ const b=document.querySelector(".timer-start"); if(b)b.textContent=state.exerciseRunning?"⏸ Pausar":"▶ Iniciar"; }
-function resetExerciseTimer(){ pauseExerciseTimer(); state.exerciseTimer=0; renderWorkout(); }
+function renderWorkoutButtons(){ const b=document.querySelector('.timer-start'); if(b)b.textContent=state.exerciseRunning?'⏸ Pausar':'▶ Iniciar'; }
+function resetExerciseTimer(){ pauseExerciseTimer(); state.exerciseTimer=0; state.exerciseStartedAt=null; updateTimers(); }
 function renderSets(e){
-  const count=parseInt(e.sets)||0;
+  const count=parseInt(e.prescribedSets)||0;
   if(!count)return `<div class="empty">A ficha original não informa a quantidade de séries deste exercício. Registre livremente:</div><div class="manual-set"><input type="number" min="0" placeholder="Reps"><input type="number" min="0" step=".5" placeholder="kg"><button onclick="addSet()">+</button></div>`;
   const ex=state.workout.exercises[state.exerciseIndex];
   while(ex.sets.length<count) ex.sets.push({reps:"",weight:"",done:false});
-  return ex.sets.map((s,i)=>`<div class="set-row"><span class="setnum">${i+1}</span><input value="${esc(s.reps)}" placeholder="${e.reps?.split("/")[i]||"reps"}" onchange="setValue(${i},'reps',this.value)"><input value="${esc(s.weight)}" placeholder="kg" inputmode="decimal" onchange="setValue(${i},'weight',this.value)"><button class="check ${s.done?'done':''}" onclick="toggleSet(${i})">${s.done?'✓':'○'}</button></div>`).join("");
+  return ex.sets.map((s,i)=>`<div class="set-row"><span class="setnum">${i+1}</span><input value="${esc(s.reps)}" placeholder="${e.prescribedReps?.split("/")[i]||"reps"}" onchange="setValue(${i},'reps',this.value)"><input value="${esc(s.weight)}" placeholder="kg" inputmode="decimal" onchange="setValue(${i},'weight',this.value)"><button class="check ${s.done?'done':''}" onclick="toggleSet(${i})">${s.done?'✓':'○'}</button></div>`).join("");
 }
 function setValue(i,k,v){state.workout.exercises[state.exerciseIndex].sets[i][k]=v;}
 function toggleSet(i){state.workout.exercises[state.exerciseIndex].sets[i].done=!state.workout.exercises[state.exerciseIndex].sets[i].done; renderWorkout();}
@@ -228,10 +388,10 @@ function addSet(){state.workout.exercises[state.exerciseIndex].sets.push({reps:"
 function finishExercise(){
   pauseExerciseTimer(); stopRest();
   const e=currentExercise(); e.duration=Math.round(state.exerciseTimer);
-  if(state.exerciseIndex<state.workout.exercises.length-1){state.exerciseIndex++;state.exerciseTimer=0;state.exerciseRunning=false;renderWorkout();}
+  if(state.exerciseIndex<state.workout.exercises.length-1){state.exerciseIndex++;state.exerciseTimer=0;state.exerciseRunning=false;state.exerciseStartedAt=null;renderWorkout();}
   else finishWorkout();
 }
-function prevExercise(){pauseExerciseTimer();stopRest();state.exerciseIndex--;state.exerciseTimer=state.workout.exercises[state.exerciseIndex].duration||0;renderWorkout();}
+function prevExercise(){pauseExerciseTimer();stopRest();if(state.exerciseIndex>0)state.exerciseIndex--;state.exerciseTimer=state.workout.exercises[state.exerciseIndex].duration||0;state.exerciseRunning=false;state.exerciseStartedAt=null;renderWorkout();}
 function finishWorkout(){
   pauseExerciseTimer();stopRest();
   state.workout.totalTime=Math.round((Date.now()-state.workoutTimerStart)/1000);
@@ -282,6 +442,10 @@ function openSettings(){
     <section class="settings-card"><label>Descanso padrão <select onchange="db.settings.rest=+this.value;save()">${[30,45,60,90,120].map(x=>`<option value="${x}" ${db.settings.rest===x?'selected':''}>${x} segundos</option>`).join("")}</select></label>
     <label class="switch">Vibração <input type="checkbox" ${db.settings.vibration?'checked':''} onchange="db.settings.vibration=this.checked;save()"></label>
     <label class="switch">Som <input type="checkbox" ${db.settings.sound?'checked':''} onchange="db.settings.sound=this.checked;save()"></label>
+    </section>
+    <section class="settings-card"><h3>Treinos</h3>
+    <p class="muted">Exclua, restaure ou adicione exercícios pela tela de cada treino.</p>
+    <div class="seg">${["A","B","C"].map(c=>`<button onclick="restoreExercises('${c}')">Restaurar ${c}</button>`).join("")}</div>
     </section>
     <section class="settings-card"><h3>Dados</h3><button class="secondary full" onclick="exportData()">Exportar dados</button><label class="filebtn">Importar dados<input type="file" accept=".json" onchange="importData(this.files[0])"></label><button class="danger full" onclick="clearData()">Apagar histórico</button></section>`,"home");
 }
