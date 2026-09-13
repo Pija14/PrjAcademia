@@ -248,6 +248,39 @@ function deleteCustomExercise(code, id, name){
   viewTraining(code);
 }
 
+// Exclusão por delegação de eventos: funciona de forma mais confiável no Android/PWA.
+document.addEventListener("click", (event)=>{
+  const baseBtn=event.target.closest?.("[data-delete-base]");
+  if(baseBtn){
+    event.preventDefault();
+    event.stopPropagation();
+    const code=baseBtn.dataset.code;
+    const section=baseBtn.dataset.section;
+    const index=Number(baseBtn.dataset.index);
+    const exercise=TRAININGS[code]?.sections.find(s=>s.name===section)?.exercises[index];
+    if(!exercise) return;
+    if(window.confirm(`Excluir "${exercise[0]}" do Treino ${code}?`)){
+      const id=exerciseId(code,section,index);
+      if(!db.excludedExercises[code]) db.excludedExercises[code]=[];
+      if(!db.excludedExercises[code].includes(id)) db.excludedExercises[code].push(id);
+      save();
+      viewTraining(code);
+    }
+    return;
+  }
+  const customBtn=event.target.closest?.("[data-delete-custom]");
+  if(customBtn){
+    event.preventDefault();
+    event.stopPropagation();
+    const code=customBtn.dataset.code, id=customBtn.dataset.id, name=customBtn.dataset.name;
+    if(window.confirm(`Excluir definitivamente "${name}"?`)){
+      db.customExercises[code]=(db.customExercises[code]||[]).filter(e=>e.id!==id);
+      save();
+      viewTraining(code);
+    }
+  }
+});
+
 function viewTraining(code){
   const t=TRAININGS[code];
   const excluded=new Set(db.excludedExercises?.[code] || []);
@@ -260,7 +293,7 @@ function viewTraining(code){
       if(excluded.has(id)) return "";
       return `<div class="exercise-row">
         <div><b>${i+1}. ${esc(e[0])}</b><small>${e[1]?e[1]+" séries":"Séries não informadas"}${e[2]?" • "+e[2]:""}</small></div>
-        <button class="delete-exercise" onclick="deleteExercise('${code}',${JSON.stringify(s.name)},${i})" title="Excluir exercício" aria-label="Excluir ${esc(e[0])}">✕</button>
+        <button class="delete-exercise" data-delete-base="1" data-code="${code}" data-section="${esc(s.name)}" data-index="${i}" title="Excluir exercício" aria-label="Excluir ${esc(e[0])}">🗑</button>
       </div>`;
     }).join("");
     return rows ? `<section class="section"><div class="section-title">${s.name}</div>${rows}</section>` : "";
@@ -269,7 +302,7 @@ function viewTraining(code){
   const customRows = custom.map(e=>`
     <div class="exercise-row">
       <div><b>+ ${esc(e.name)}</b><small>${esc(e.section)}${e.sets?` • ${esc(e.sets)} séries`:""}${e.reps?` • ${esc(e.reps)}`:""}</small></div>
-      <button class="delete-exercise" onclick="deleteCustomExercise('${code}',${JSON.stringify(e.id)},${JSON.stringify(e.name)})" title="Excluir exercício personalizado">✕</button>
+      <button class="delete-exercise" data-delete-custom="1" data-code="${code}" data-id="${esc(e.id)}" data-name="${esc(e.name)}" title="Excluir exercício personalizado">🗑</button>
     </div>`).join("");
 
   const excludedRows = t.sections.flatMap(s=>s.exercises.map((e,i)=>{
@@ -417,7 +450,7 @@ function renderCalendar(){
   for(let i=0;i<offset;i++)cells.push(`<div class="cal-day empty"></div>`);
   for(let d=1;d<=days;d++){
     const iso=`${y}-${pad(m+1)}-${pad(d)}`, ws=db.workouts.filter(w=>w.date===iso);
-    cells.push(`<button class="cal-day ${ws.length?'has':''}" onclick="calendarDay('${iso}')"><span>${d}</span>${ws.map(w=>`<i>${w.type}</i>`).join("")}</button>`);
+    cells.push(`<button class="cal-day ${ws.length?'has':''}" onclick="calendarDay('${iso}')"><span>${d}</span>${ws.map(w=>`<i>${w.type}</i><em>${fmtShort(w.totalTime||0)}</em>`).join("")}</button>`);
   }
   layout(`<div class="calendar-head"><button class="iconbtn" onclick="changeMonth(-1)">‹</button><h2>${monthLabel(y,m)}</h2><button class="iconbtn" onclick="changeMonth(1)">›</button></div>
   <div class="week"><b>SEG</b><b>TER</b><b>QUA</b><b>QUI</b><b>SEX</b><b>SÁB</b><b>DOM</b></div><div class="calendar">${cells.join("")}</div>
