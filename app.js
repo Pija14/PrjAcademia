@@ -168,34 +168,30 @@ function renderTrainings(){
 
 function exerciseId(code, section, index){ return `${code}-${section}-${index}`; }
 
-function deleteExercise(code, section, index){
-  const id = exerciseId(code, section, index);
-  const exercise = TRAININGS[code].sections.find(s=>s.name===section)?.exercises[index];
-  if(!exercise) return;
-  if(!confirm(`Excluir "${exercise[0]}" do Treino ${code}?`)) return;
-  if(!db.excludedExercises[code]) db.excludedExercises[code]=[];
-  if(!db.excludedExercises[code].includes(id)) db.excludedExercises[code].push(id);
-  save();
-  viewTraining(code);
+function isExerciseEnabled(code, id){
+  return !(db.excludedExercises?.[code] || []).includes(id);
 }
 
-function restoreExercise(code, id, name){
-  const list = db.excludedExercises[code] || [];
-  db.excludedExercises[code] = list.filter(x=>x !== id);
+function toggleExercise(code, id, enabled){
+  if(!db.excludedExercises[code]) db.excludedExercises[code]=[];
+  const list = db.excludedExercises[code];
+  if(enabled){
+    db.excludedExercises[code] = list.filter(x=>x!==id);
+  }else if(!list.includes(id)){
+    list.push(id);
+  }
   save();
   viewTraining(code);
 }
 
 function restoreExercises(code){
   if(!db.excludedExercises?.[code]?.length){
-    alert("Não há exercícios excluídos neste treino.");
+    alert("Todos os exercícios já estão ativos.");
     return;
   }
-  if(confirm(`Restaurar todos os exercícios excluídos do Treino ${code}?`)){
-    db.excludedExercises[code]=[];
-    save();
-    viewTraining(code);
-  }
+  db.excludedExercises[code]=[];
+  save();
+  viewTraining(code);
 }
 
 function openAddExercise(code){
@@ -241,53 +237,46 @@ function saveCustomExercise(code){
   viewTraining(code);
 }
 
-function deleteCustomExercise(code, id, name){
-  if(!confirm(`Excluir definitivamente "${name}"?`)) return;
-  db.customExercises[code] = (db.customExercises[code]||[]).filter(e=>e.id!==id);
-  save();
-  viewTraining(code);
-}
-
-// Exclusão: usando onclick direto no botão para máxima compatibilidade com Android/PWA.
-
 function viewTraining(code){
   const t=TRAININGS[code];
   const excluded=new Set(db.excludedExercises?.[code] || []);
   const custom=db.customExercises?.[code] || [];
   const visibleCount=flatTraining(code).length;
 
+  const switchHtml=(id, enabled, name)=>`
+    <label class="exercise-switch" title="${enabled?'Desativar':'Ativar'} ${esc(name)}">
+      <input type="checkbox" ${enabled?'checked':''} onchange="toggleExercise(${JSON.stringify(code)},${JSON.stringify(id)},this.checked)" aria-label="${enabled?'Desativar':'Ativar'} ${esc(name)}">
+      <span class="switch-slider"></span>
+    </label>`;
+
   const sections = t.sections.map(s=>{
+    let number=0;
     const rows=s.exercises.map((e,i)=>{
       const id=exerciseId(code,s.name,i);
-      if(excluded.has(id)) return "";
-      return `<div class="exercise-row">
-        <div><b>${i+1}. ${esc(e[0])}</b><small>${e[1]?e[1]+" séries":"Séries não informadas"}${e[2]?" • "+e[2]:""}</small></div>
-        <button class="delete-exercise" onclick="deleteExercise(${JSON.stringify(code)},${JSON.stringify(s.name)},${i})" title="Excluir exercício" aria-label="Excluir ${esc(e[0])}">🗑</button>
+      const enabled=!excluded.has(id);
+      number++;
+      return `<div class="exercise-row ${enabled?'':'exercise-disabled'}">
+        <div><b>${number}. ${esc(e[0])}</b><small>${e[1]?e[1]+" séries":"Séries não informadas"}${e[2]?" • "+e[2]:""}${enabled?'':' • desativado'}</small></div>
+        ${switchHtml(id,enabled,e[0])}
       </div>`;
     }).join("");
-    return rows ? `<section class="section"><div class="section-title">${s.name}</div>${rows}</section>` : "";
+    return `<section class="section"><div class="section-title">${s.name}</div>${rows}</section>`;
   }).join("");
 
-  const customRows = custom.map(e=>`
-    <div class="exercise-row">
-      <div><b>+ ${esc(e.name)}</b><small>${esc(e.section)}${e.sets?` • ${esc(e.sets)} séries`:""}${e.reps?` • ${esc(e.reps)}`:""}</small></div>
-      <button class="delete-exercise" onclick="deleteCustomExercise(${JSON.stringify(code)},${JSON.stringify(e.id)},${JSON.stringify(e.name)})" title="Excluir exercício personalizado">🗑</button>
-    </div>`).join("");
-
-  const excludedRows = t.sections.flatMap(s=>s.exercises.map((e,i)=>{
-    const id=exerciseId(code,s.name,i);
-    return excluded.has(id) ? `<div class="exercise-row excluded-row">
-      <div><b>${esc(e[0])}</b><small>${s.name} • excluído</small></div>
-      <button class="restore-exercise" onclick="restoreExercise('${code}',${JSON.stringify(id)},${JSON.stringify(e[0])})">↺ Restaurar</button>
-    </div>` : "";
-  })).join("");
+  const customRows = custom.map(e=>{
+    const enabled=isExerciseEnabled(code,e.id);
+    return `<div class="exercise-row ${enabled?'':'exercise-disabled'}">
+      <div><b>+ ${esc(e.name)}</b><small>${esc(e.section)}${e.sets?` • ${esc(e.sets)} séries`:""}${e.reps?` • ${esc(e.reps)}`:""}${enabled?'':' • desativado'}</small></div>
+      ${switchHtml(e.id,enabled,e.name)}
+    </div>`;
+  }).join("");
 
   layout(`<button class="back" onclick="go('trainings')">‹ Voltar</button>
     <div class="detail-head"><span class="badge">${code}</span><div><h2>${t.name}</h2><p>${t.muscles.join(" • ")}</p></div></div>
 
     <div class="training-tools">
-      <span>${visibleCount} exercício(s) ativo(s)</span>
-      ${excluded.size?`<button class="secondary compact" onclick="restoreExercises('${code}')">↺ Restaurar todos</button>`:""}
+      <span>${visibleCount} exercício(s) ativo(s) de ${t.sections.reduce((n,s)=>n+s.exercises.length,0)+custom.length}</span>
+      ${excluded.size?`<button class="secondary compact" onclick="restoreExercises('${code}')">✓ Ativar todos</button>`:""}
     </div>
 
     ${sections}
@@ -295,9 +284,7 @@ function viewTraining(code){
 
     <button class="add-exercise" onclick="openAddExercise('${code}')">＋ Adicionar exercício manualmente</button>
 
-    ${excludedRows?`<section class="section excluded-section"><div class="section-title">Exercícios excluídos</div>${excludedRows}</section>`:""}
-
-    ${visibleCount?`<button class="primary full" onclick="startWorkout('${code}')">▶ Iniciar ${t.name}</button>`:`<div class="empty big">Este treino está sem exercícios ativos. Restaure ou adicione um exercício.</div>`}`);
+    ${visibleCount?`<button class="primary full" onclick="startWorkout('${code}')">▶ Iniciar ${t.name}</button>`:`<div class="empty big">Este treino está sem exercícios ativos. Ative pelo menos um exercício para iniciar.</div>`}`);
 }
 
 function startWorkout(code){
