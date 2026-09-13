@@ -124,7 +124,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 // === Regras de execução do treino ===
-const DEFAULT_REST_SECONDS = 90;
+const DEFAULT_REST_SECONDS = 30;
 let restAlertTriggered = false;
 
 function exerciseReadyForStart(exercise) {
@@ -157,7 +157,7 @@ function notifyOneMinuteRest() {
   } catch (_) {}
 }
 
-const REST_SECONDS = 90;
+const REST_SECONDS = 30;
 const TRAININGS = {
   A: {
     name: "Treino A",
@@ -315,6 +315,58 @@ function ensureWorkoutPlan(code){
   const plan=allExerciseLibrary().filter(e=>e.source===`Treino ${code}` || e.source===`Meus exercícios • ${code}`).map(e=>({...e,enabled:!excluded.has(e.id)}));
   db.workoutPlans[code]=plan; save(); return plan;
 }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function dateBR(iso){ if(!iso)return ""; const [y,m,d]=iso.split("-"); return `${d}/${m}/${y}`; }
+function totalExercises(code){ return flatTraining(code).length; }
+function monthLabel(y,m){ return new Intl.DateTimeFormat("pt-BR",{month:"long",year:"numeric"}).format(new Date(y,m,1)); }
+
+function layout(content, active="home"){
+  const app=document.getElementById("app");
+  if(!app) throw new Error("Elemento #app não encontrado.");
+  app.innerHTML = `
+  <div class="shell">
+    <header class="topbar"><div><div class="eyebrow">CONTROLE DE TREINO</div><h1>Meu Treino</h1></div>
+      <button class="iconbtn" onclick="openSettings()" aria-label="Configurações">⚙</button>
+    </header>
+    <main>${content}</main>
+    <nav class="bottomnav">
+      <button class="${active==='home'?'active':''}" onclick="go('home')"><span>⌂</span>Início</button>
+      <button class="${active==='calendar'?'active':''}" onclick="go('calendar')"><span>▦</span>Calendário</button>
+      <button class="${active==='trainings'?'active':''}" onclick="go('trainings')"><span>💪</span>Treinos</button>
+      <button class="${active==='history'?'active':''}" onclick="go('history')"><span>◷</span>Histórico</button>
+    </nav>
+  </div>`;
+}
+
+function go(page){
+  stopIntervals();
+  state.page=page; state.training=null; state.workout=null;
+  if(page==="home")renderHome();
+  if(page==="calendar")renderCalendar();
+  if(page==="trainings")renderTrainings();
+  if(page==="history")renderHistory();
+}
+function renderHome(){
+  const recent=db.workouts[db.workouts.length-1];
+  const month=todayISO().slice(0,7);
+  const count=db.workouts.filter(w=>w.date.startsWith(month)).length;
+  const total=db.workouts.reduce((a,w)=>a+(w.totalTime||0),0);
+  layout(`
+    <section class="hero"><div><span class="pill">4–5x por semana</span><h2>Pronto para treinar?</h2><p>Escolha a divisão e acompanhe cada exercício, série e tempo.</p></div><div class="hero-icon">⚡</div></section>
+    <div class="stats"><div><b>${count}</b><span>treinos no mês</span></div><div><b>${fmtShort(total)}</b><span>tempo total</span></div><div><b>${recent?recent.type:"—"}</b><span>último treino</span></div></div>
+    <h3>Divisão</h3>
+    <div class="training-grid">${["A","B","C"].map(code=>{
+      const t=TRAININGS[code];
+      return `<article class="training-card ${code.toLowerCase()}"><div class="card-top"><span class="badge">${code}</span><span class="exercise-count">${totalExercises(code)} exercícios</span></div><h3>${esc(trainingName(code))}</h3><p>${t.muscles.join(" • ")}</p><button class="primary" onclick="startWorkout('${code}')">▶ Iniciar treino</button></article>`
+    }).join("")}</div>
+    ${recent?`<section class="recent"><div><span class="eyebrow">ÚLTIMO TREINO</span><h3>${recent.type} • ${dateBR(recent.date)}</h3><p>${fmt(recent.totalTime||0)} • ${recent.completedExercises||0} exercícios</p></div><button class="secondary" onclick="showWorkoutDetails('${recent.id}')">Detalhes</button></section>`:""}
+  `,"home");
+}
+function renderTrainings(){
+  layout(`<h2>Treinos A, B e C</h2><p class="muted">Toque em um treino para ver todos os exercícios.</p>
+    <div class="list">${["A","B","C"].map(c=>`<button class="list-card" onclick="viewTraining('${c}')"><span class="badge">${c}</span><div><b>${esc(trainingName(c))}</b><small>${TRAININGS[c].muscles.join(" • ")}</small></div><span>›</span></button>`).join("")}</div>`,"trainings");
+}
+
 function customizeTraining(code){ ensureWorkoutPlan(code); editTraining(code); }
 function editTraining(code){
   const plan=ensureWorkoutPlan(code);
@@ -662,7 +714,7 @@ function renderHistory(){
 
 function openSettings(){
   layout(`<button class="back" onclick="go('home')">‹ Voltar</button><h2>Configurações</h2>
-    <section class="settings-card"><label>Descanso padrão <select onchange="90=+this.value;save()">${[30,45,60,90,120].map(x=>`<option value="${x}" ${90===x?'selected':''}>${x} segundos</option>`).join("")}</select></label>
+    <section class="settings-card"><label>Descanso padrão <select onchange="db.settings.rest=+this.value;save()">${[30,45,60,90,120].map(x=>`<option value="${x}" ${db.settings.rest===x?'selected':''}>${x} segundos</option>`).join("")}</select></label>
     <label class="switch">Vibração <input type="checkbox" ${db.settings.vibration?'checked':''} onchange="db.settings.vibration=this.checked;save()"></label>
     <label class="switch">Som <input type="checkbox" ${db.settings.sound?'checked':''} onchange="db.settings.sound=this.checked;save()"></label>
     </section>
@@ -767,7 +819,7 @@ async function workoutExerciseSave(config) {
       series:Number(config.series)||0,
       repeticoes:Number(config.repeticoes)||0,
       carga:config.carga ?? "",
-      descanso:90,
+      descanso:30,
       atualizadoEm:new Date().toISOString()
     });
     req.onsuccess=()=>resolve(req.result);
