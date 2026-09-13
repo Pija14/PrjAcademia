@@ -1,3 +1,36 @@
+
+// === Regras de execução do treino ===
+const DEFAULT_REST_SECONDS = 90;
+let restAlertTriggered = false;
+
+function exerciseReadyForStart(exercise) {
+  const series = Number(exercise?.series ?? exercise?.sets ?? exercise?.qtdSeries ?? 0);
+  const load = exercise?.carga ?? exercise?.load ?? exercise?.peso;
+  const hasLoad = load !== undefined && load !== null && String(load).trim() !== "" && Number(load) >= 0;
+  return series > 0 && hasLoad;
+}
+
+function notifyOneMinuteRest() {
+  try {
+    if ("vibrate" in navigator) navigator.vibrate([250, 120, 250]);
+  } catch (_) {}
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtx) {
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      gain.gain.value = 0.18;
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start();
+      setTimeout(() => { osc.stop(); ctx.close?.(); }, 500);
+    }
+  } catch (_) {}
+}
+
+const REST_SECONDS = 90;
 const TRAININGS = {
   A: {
     name: "Treino A",
