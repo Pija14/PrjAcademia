@@ -109,7 +109,7 @@ if(!db.workoutNames) db.workoutNames = {A:"Treino A",B:"Treino B",C:"Treino C"};
   if(!Array.isArray(db.excludedExercises[k])) db.excludedExercises[k]=[];
   if(!Array.isArray(db.customExercises[k])) db.customExercises[k]=[];
 });
-let state = { page:"home", training:null, exerciseIndex:0, workout:null, exerciseTimer:0, exerciseRunning:false, exerciseStartedAt:null, restTimer:0, restRunning:false, timerInterval:null, restInterval:null };
+let state = { page:"home", training:null, exerciseIndex:0, workout:null, exerciseTimer:0, exerciseRunning:false, exerciseStartedAt:null, currentSetIndex:0, restTimer:0, restRunning:false, timerInterval:null, restInterval:null };
 
 function save(){ localStorage.setItem(KEY, JSON.stringify(db)); }
 function pad(n){ return String(n).padStart(2,"0"); }
@@ -300,7 +300,7 @@ function viewTraining(code){
   const custom=db.customExercises?.[code] || [];
   const visibleCount=flatTraining(code).length;
   const totalCount=customized ? plan.length : t.sections.reduce((n,s)=>n+s.exercises.length,0)+custom.length;
-  const switchHtml=(id, enabled, name)=>`<label class="exercise-switch" title="${enabled?'Desativar':'Ativar'} ${esc(name)}"><input type="checkbox" ${enabled?'checked':''} onchange="toggleExercise(${JSON.stringify(code)},${JSON.stringify(id)},this.checked)" aria-label="${enabled?'Desativar':'Ativar'} ${esc(name)}"><span class="switch-slider"></span><span class="switch-text">${enabled?'ON':'OFF'}</span></label>`;
+  const switchHtml=(id, enabled, name)=>`<label class="exercise-switch" title="${enabled?'Desativar':'Ativar'} ${esc(name)}"><input type="checkbox" ${enabled?'checked':''} onchange="toggleExercise(${JSON.stringify(code)},${JSON.stringify(id)},this.checked)" aria-label="${enabled?'Desativar':'Ativar'} ${esc(name)}"><span class="switch-slider"></span></label>`;
   let sectionsHtml='';
   if(customized){
     const sections=[...new Set(plan.map(e=>e.section||'Outros'))];
@@ -321,14 +321,38 @@ function viewTraining(code){
 function startWorkout(code){
   stopIntervals();
   const ex=flatTraining(code);
-  state.training=code; state.exerciseIndex=0; state.exerciseTimer=0; state.exerciseRunning=false; state.exerciseStartedAt=null; state.restTimer=0; state.restRunning=false;
-  state.workout={id:Date.now().toString(), type:code, date:todayISO(), startedAt:new Date().toISOString(), totalTime:0, exercises:ex.map(e=>({id:e.id,name:e.name,section:e.section,prescribedSets:e.sets,prescribedReps:e.reps,duration:0,sets:[],completed:false}))};
+  state.training=code; state.exerciseIndex=0; state.exerciseTimer=0; state.exerciseRunning=false; state.exerciseStartedAt=null; state.currentSetIndex=0; state.restTimer=0; state.restRunning=false;
+  state.workout={id:Date.now().toString(), type:code, date:todayISO(), startedAt:new Date().toISOString(), totalTime:0, exercises:ex.map(e=>({id:e.id,name:e.name,section:e.section,prescribedSets:e.sets,prescribedReps:e.reps,duration:0,sets:[]}))};
   state.workoutTimerStart=Date.now();
   renderWorkout();
 }
 
 function currentExercise(){ return state.workout.exercises[state.exerciseIndex]; }
+function exerciseSetCount(e){
+  const n=parseInt(e.prescribedSets);
+  return Number.isFinite(n) && n>0 ? n : 0;
+}
+function nextPendingSetIndex(e){
+  const ex=state.workout.exercises[state.exerciseIndex];
+  const count=exerciseSetCount(e);
+  if(!count) return -1;
+  while(ex.sets.length<count) ex.sets.push({reps:"",weight:"",done:false});
+  for(let i=Math.max(0,state.currentSetIndex);i<count;i++) if(!ex.sets[i].done) return i;
+  for(let i=0;i<count;i++) if(!ex.sets[i].done) return i;
+  return -1;
+}
+function allSetsDone(e){
+  const count=exerciseSetCount(e);
+  if(!count) return false;
+  const ex=state.workout.exercises[state.exerciseIndex];
+  while(ex.sets.length<count) ex.sets.push({reps:"",weight:"",done:false});
+  return ex.sets.slice(0,count).every(s=>s.done);
+}
 function startExerciseTimer(){
+  if(state.restRunning) return;
+  if(allSetsDone(currentExercise())) return;
+  const idx=nextPendingSetIndex(currentExercise());
+  if(idx>=0) state.currentSetIndex=idx;
   if(state.exerciseRunning) return;
   state.exerciseRunning=true;
   state.exerciseStartedAt=Date.now()-(state.exerciseTimer*1000);
@@ -342,7 +366,17 @@ function pauseExerciseTimer(){
   state.exerciseStartedAt=null;
   if(state.timerInterval){clearInterval(state.timerInterval);state.timerInterval=null;}
   updateTimers();
-  renderWorkoutButtons();
+}
+function completeExercise(){
+  const e=currentExercise();
+  if(!allSetsDone(e)) return;
+  pauseExerciseTimer();
+  stopRest();
+  e.duration=Math.round(state.exerciseTimer);
+  e.completed=true;
+  state.exerciseTimer=0;
+  state.exerciseStartedAt=null;
+  renderWorkout();
 }
 function startMainTick(){
   if(state.timerInterval) clearInterval(state.timerInterval);
@@ -353,20 +387,64 @@ function startMainTick(){
 }
 function startRest(){
   if(state.restRunning) return;
-  state.restRunning=true; state.restTimer=Number(db.settings.rest)||60;
+  const e=currentExercise();
+  // O descanso encerra a contagem da série atual.
+  if(state.exerciseRunning) pauseExerciseTimer();
+  const count=exerciseSetCount(e);
+  if(count){
+    const ex=state.workout.exercises[state.exerciseIndex];
+    while(ex.sets.length<count) ex.sets.push({reps:"",weight:"",done:false});
+    const idx=Math.min(state.currentSetIndex,count-1);
+    ex.sets[idx].done=true;
+    state.currentSetIndex=idx+1;
+  }
+  state.restRunning=true;
+  state.restTimer=Number(db.settings.rest)||60;
   if(state.restInterval) clearInterval(state.restInterval);
   state.restInterval=setInterval(()=>{
     state.restTimer-=1; updateTimers();
     if(state.restTimer<=0){
-      clearInterval(state.restInterval); state.restInterval=null; state.restRunning=false;
+      finishRestAndStartNextSet();
       if(navigator.vibrate && db.settings.vibration) navigator.vibrate([250,120,250]);
-      beep(); renderWorkout();
+      beep();
     }
   },1000);
   renderWorkout();
 }
-function stopRest(){state.restRunning=false;if(state.restInterval){clearInterval(state.restInterval);state.restInterval=null;}}
-function stopIntervals(){if(state.timerInterval)clearInterval(state.timerInterval);if(state.restInterval)clearInterval(state.restInterval);state.timerInterval=null;state.restInterval=null;}
+function finishRestAndStartNextSet(){
+  stopRest();
+  const e=currentExercise();
+  const idx=nextPendingSetIndex(e);
+  if(idx>=0){
+    state.currentSetIndex=idx;
+    state.exerciseTimer=0;
+    state.exerciseStartedAt=null;
+    startExerciseTimer();
+  } else {
+    state.exerciseTimer=0;
+    state.exerciseStartedAt=null;
+    renderWorkout();
+  }
+}
+function stopRest(){
+  if(!state.restRunning) return;
+  if(state.restInterval){clearInterval(state.restInterval);state.restInterval=null;}
+  state.restRunning=false;
+  // Ao parar o descanso, inicia automaticamente a próxima série, se houver.
+  const e=currentExercise();
+  const idx=nextPendingSetIndex(e);
+  if(idx>=0){
+    state.currentSetIndex=idx;
+    state.exerciseTimer=0;
+    state.exerciseStartedAt=null;
+    startExerciseTimer();
+  } else {
+    state.exerciseTimer=0;
+    state.exerciseStartedAt=null;
+    renderWorkout();
+  }
+}
+function stopIntervals(){if(state.timerInterval)clearInterval(state.timerInterval);if(state.restInterval)clearInterval(state.restInterval);state.timerInterval=null;state.restInterval=null;state.exerciseRunning=false;state.restRunning=false;}
 function beep(){if(!db.settings.sound)return;try{const c=new(window.AudioContext||window.webkitAudioContext)();const o=c.createOscillator();const g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.05;o.start();o.stop(c.currentTime+.18);}catch(e){}}
 function updateTimers(){
   const a=document.getElementById('exerciseTimer'); if(a)a.textContent=fmt(state.exerciseTimer);
@@ -377,24 +455,31 @@ function updateTimers(){
 function renderWorkout(){
   const e=currentExercise(), all=state.workout.exercises, progress=Math.round(((state.exerciseIndex+1)/all.length)*100);
   const last=db.workouts.flatMap(w=>w.exercises||[]).findLast?.(x=>x.name===e.name) || null;
+  const count=exerciseSetCount(e);
+  const doneSets=count ? e.sets.slice(0,count).filter(s=>s.done).length : 0;
+  const complete=allSetsDone(e);
+  const canNext=complete && !state.restRunning;
+  const setLabel=count ? `Série ${Math.min(state.currentSetIndex+1,count)} de ${count}` : 'Série livre';
   layout(`
     <div class="workout-header"><button class="back" onclick="confirmExitWorkout()">‹ Sair</button><span class="pill">TREINO ${state.training}</span></div>
     <div class="workout-progress"><div style="width:${progress}%"></div></div>
     <div class="workout-meta"><span>Exercício ${state.exerciseIndex+1} de ${all.length}</span><b id="workoutTimer">${fmt((Date.now()-state.workoutTimerStart)/1000)}</b></div>
     <section class="focus-card"><span class="eyebrow">${esc(e.section)}</span><h2>${esc(e.name)}</h2><div class="prescription">${e.prescribedSets||"Séries não informadas"} ${e.prescribedSets ? '<span>×</span> ' : ''}${e.prescribedReps||""}</div>
+      <div class="set-status">${setLabel} • ${doneSets}${count?' de '+count:''} concluída(s)</div>
       <div class="big-timer" id="exerciseTimer">${fmt(state.exerciseTimer)}</div>
-      <div class="timer-actions"><button class="timer-start" onclick="${state.exerciseRunning?'pauseExerciseTimer()':'startExerciseTimer()'}">${state.exerciseRunning?'⏸ Pausar':'▶ Iniciar'}</button><button class="secondary" onclick="resetExerciseTimer()">↺ Zerar</button></div>
+      <div class="timer-actions"><button class="timer-start" onclick="${state.exerciseRunning?'pauseExerciseTimer()':'startExerciseTimer()'}" ${complete||state.restRunning?'disabled':''}>${state.exerciseRunning?'⏸ Pausar':'▶ Iniciar'}</button><button class="secondary" onclick="resetExerciseTimer()" ${state.restRunning?'disabled':''}>↺ Zerar</button></div>
+      ${state.exerciseRunning?`<button class="complete-exercise" onclick="completeExercise()" ${complete?'':'disabled'}>✓ Concluir exercício</button>`:''}
+      ${complete?`<div class="exercise-completed">✓ Exercício concluído</div>`:''}
     </section>
-    <section class="rest-card"><div><span class="eyebrow">DESCANSO</span><b id="restTimer">${fmtShort(state.restRunning?state.restTimer:db.settings.rest)}</b></div><button class="secondary" onclick="${state.restRunning?'stopRest();renderWorkout()':'startRest()'}">${state.restRunning?'Parar':'Iniciar descanso'}</button></section>
+    <section class="rest-card"><div><span class="eyebrow">DESCANSO</span><b id="restTimer">${fmtShort(state.restRunning?state.restTimer:db.settings.rest)}</b></div><button class="secondary" onclick="${state.restRunning?'stopRest()':'startRest()'}" ${complete?'disabled':''}>${state.restRunning?'Parar':'Iniciar descanso'}</button></section>
     ${last&&last.sets?.length?`<div class="last-load">Último registro: ${last.sets.map(s=>(s.weight?s.weight+" kg":"sem carga")).join(" • ")}</div>`:""}
     <section class="sets-card"><div class="section-title">Séries e carga</div>${renderSets(e)}</section>
-    <div class="nav-ex"><button class="secondary" ${state.exerciseIndex===0?"disabled":""} onclick="prevExercise()">← Anterior</button><button class="primary" ${e.completed?"":"disabled"} onclick="finishExercise()">${state.exerciseIndex===all.length-1?"Finalizar treino":"Próximo →"}</button></div>
+    <div class="nav-ex"><button class="secondary" ${state.exerciseIndex===0?"disabled":""} onclick="prevExercise()">← Anterior</button><button class="primary" ${canNext?'':'disabled'} onclick="finishExercise()">${state.exerciseIndex===all.length-1?"Finalizar treino":"Próximo →"}</button></div>
   `);
   if(state.exerciseRunning) startMainTick();
   updateTimers();
 }
-function renderWorkoutButtons(){ const b=document.querySelector('.timer-start'); if(b)b.textContent=state.exerciseRunning?'⏸ Pausar':'▶ Iniciar'; }
-function resetExerciseTimer(){ pauseExerciseTimer(); state.exerciseTimer=0; state.exerciseStartedAt=null; updateTimers(); }
+function resetExerciseTimer(){ pauseExerciseTimer(); state.exerciseTimer=0; state.exerciseStartedAt=null; updateTimers(); renderWorkout(); }
 function renderSets(e){
   const count=parseInt(e.prescribedSets)||0;
   if(!count)return `<div class="empty">A ficha original não informa a quantidade de séries deste exercício. Registre livremente:</div><div class="manual-set"><input type="number" min="0" placeholder="Reps"><input type="number" min="0" step=".5" placeholder="kg"><button onclick="addSet()">+</button></div>`;
@@ -403,50 +488,22 @@ function renderSets(e){
   return ex.sets.map((s,i)=>`<div class="set-row"><span class="setnum">${i+1}</span><input value="${esc(s.reps)}" placeholder="${e.prescribedReps?.split("/")[i]||"reps"}" onchange="setValue(${i},'reps',this.value)"><input value="${esc(s.weight)}" placeholder="kg" inputmode="decimal" onchange="setValue(${i},'weight',this.value)"><button class="check ${s.done?'done':''}" onclick="toggleSet(${i})">${s.done?'✓':'○'}</button></div>`).join("");
 }
 function setValue(i,k,v){state.workout.exercises[state.exerciseIndex].sets[i][k]=v;}
-function toggleSet(i){state.workout.exercises[state.exerciseIndex].sets[i].done=!state.workout.exercises[state.exerciseIndex].sets[i].done; renderWorkout();}
+function toggleSet(i){const ex=state.workout.exercises[state.exerciseIndex]; ex.sets[i].done=!ex.sets[i].done; if(ex.sets[i].done && i===state.currentSetIndex) state.currentSetIndex=i+1; if(!ex.sets[i].done) state.currentSetIndex=Math.min(state.currentSetIndex,i); renderWorkout();}
 function addSet(){state.workout.exercises[state.exerciseIndex].sets.push({reps:"",weight:"",done:false});renderWorkout();}
-function allSetsCompleted(e){
-  const count=parseInt(e.prescribedSets)||0;
-  if(!count) return true;
-  while(e.sets.length<count) e.sets.push({reps:"",weight:"",done:false});
-  return e.sets.slice(0,count).every(s=>s.done);
-}
-function completeCurrentExercise(){
-  const e=currentExercise();
-  if(!allSetsCompleted(e)){
-    alert("Conclua todas as séries do exercício antes de continuar.");
-    return;
-  }
-  pauseExerciseTimer();
-  stopRest();
-  e.duration=Math.round(state.exerciseTimer);
-  e.completed=true;
-  state.exerciseTimer=0;
-  state.exerciseRunning=false;
-  state.exerciseStartedAt=null;
-  renderWorkout();
-}
 function finishExercise(){
   const e=currentExercise();
-  if(!e.completed){
-    alert("Conclua o exercício e todas as séries antes de continuar.");
-    return;
-  }
+  if(!allSetsDone(e)) return;
   pauseExerciseTimer(); stopRest();
-  if(state.exerciseIndex<state.workout.exercises.length-1){
-    state.exerciseIndex++;
-    state.exerciseTimer=0;
-    state.exerciseRunning=false;
-    state.exerciseStartedAt=null;
-    renderWorkout();
-  } else finishWorkout();
+  e.duration=Math.round(state.exerciseTimer); e.completed=true;
+  if(state.exerciseIndex<state.workout.exercises.length-1){state.exerciseIndex++;state.exerciseTimer=0;state.exerciseRunning=false;state.exerciseStartedAt=null;state.currentSetIndex=0;renderWorkout();}
+  else finishWorkout();
 }
-function prevExercise(){pauseExerciseTimer();stopRest();if(state.exerciseIndex>0)state.exerciseIndex--;state.exerciseTimer=state.workout.exercises[state.exerciseIndex].duration||0;state.exerciseRunning=false;state.exerciseStartedAt=null;renderWorkout();}
+function prevExercise(){pauseExerciseTimer();if(state.restRunning) {if(state.restInterval)clearInterval(state.restInterval);state.restInterval=null;state.restRunning=false;} if(state.exerciseIndex>0)state.exerciseIndex--;state.exerciseTimer=state.workout.exercises[state.exerciseIndex].duration||0;state.exerciseRunning=false;state.exerciseStartedAt=null;state.currentSetIndex=0;renderWorkout();}
 function finishWorkout(){
   pauseExerciseTimer();stopRest();
   state.workout.totalTime=Math.round((Date.now()-state.workoutTimerStart)/1000);
   state.workout.endTime=new Date().toISOString();
-  state.workout.completedExercises=state.workout.exercises.filter(e=>e.completed).length;
+  state.workout.completedExercises=state.workout.exercises.filter(e=>e.duration>0 || e.sets.some(s=>s.done||s.reps||s.weight)).length;
   db.workouts.push(state.workout); save();
   const done=state.workout; state.workout=null;
   layout(`<section class="complete"><div class="complete-icon">✓</div><span class="eyebrow">TREINO FINALIZADO</span><h2>Excelente trabalho!</h2><p>Treino ${done.type} concluído em ${dateBR(done.date)}.</p>
