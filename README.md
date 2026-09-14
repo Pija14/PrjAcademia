@@ -53,11 +53,11 @@ Corrigida a tela de execução para preservar as séries e repetições prescrit
 - Service Worker/cache atualizado para v27.
 
 
-## v28 - UX/UI Tela de Treinos
+## v29 - UX/UI Tela de Treinos
 - Cards com cores suaves por nível: Básico azul, Intermediário verde, Avançado amarelo e Personalizado avermelhado.
 - Botão `+ Treino`.
 - Remoção do título duplicado da área de treinos na tela inicial.
 - Exclusão lógica protegida por confirmação, sem apagar histórico.
 - Ícone de lixeira separado do clique do card via `stopPropagation`.
 - Padronização visual de nomes de treinos, grupos e exercícios.
-- Cache do Service Worker atualizado para v28.
+- Cache do Service Worker atualizado para v29.
