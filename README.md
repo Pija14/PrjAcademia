@@ -36,3 +36,18 @@ Corrigida a tela de execução para preservar as séries e repetições prescrit
 - Validação do nome.
 - Seleção do grupo muscular baseada no treino.
 - Cancelamento sem salvar.
+
+## Versão v27 — múltiplos treinos e histórico automático
+- Meus Treinos com quantidade ilimitada de treinos.
+- Treino Básico migrado e preservado; Treino B e Treino C também são preservados.
+- Hierarquia: treino → grupo muscular → exercício → séries.
+- Criação, edição, duplicação, ativação/desativação e organização de treinos.
+- Grupos musculares e exercícios organizáveis por treino.
+- Carga e repetições independentes por série.
+- Validação somente da série que será iniciada.
+- Cronômetro fixo de 60s + descanso automático de 30s, com som e vibração.
+- Próxima série iniciada somente manualmente.
+- Conclusão automática de exercício e treino.
+- Histórico de treinos concluídos.
+- Calendário marcado automaticamente e detalhes por dia.
+- Service Worker/cache atualizado para v27.
