@@ -329,13 +329,13 @@ function totalExercises(code){ return flatTraining(code).length; }
 function monthLabel(y,m){ return new Intl.DateTimeFormat("pt-BR",{month:"long",year:"numeric"}).format(new Date(y,m,1)); }
 
 function layout(content, active="home"){
-  const navActive = active === "training-edit" ? "trainings" : active;
+  const navActive = (active === "training-edit" || active === "training-new") ? "trainings" : active;
   const app=document.getElementById("app");
   if(!app) throw new Error("Elemento #app não encontrado.");
   app.innerHTML = `
   <div class="shell">
     <header class="topbar"><div><div class="eyebrow">CONTROLE DE TREINO</div><h1>Meu Treino</h1></div>
-      <div class="topbar-actions">${active==='trainings'?'<button class="iconbtn top-add" onclick="createMyWorkout()" aria-label="Novo treino" title="Novo treino">＋</button>':''}<button class="iconbtn" onclick="openSettings()" aria-label="Configurações" title="Configurações">⚙</button></div>
+      <div class="topbar-actions">${active==='trainings'?'<button class="iconbtn top-add" onclick="renderNewWorkout()" aria-label="Novo treino" title="Novo treino">＋</button>':''}<button class="iconbtn" onclick="openSettings()" aria-label="Configurações" title="Configurações">⚙</button></div>
     </header>
     <main>${content}</main>
     <nav class="bottomnav">
@@ -942,20 +942,73 @@ function renderTrainings(){
   const cards=db.myWorkouts.filter(w=>w.active!==false).map(w=>`<article class="training-card f2-card ${f2LevelClass(w.level)}" onclick="startWorkoutById('${w.id}')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();startWorkoutById('${w.id}')}" aria-label="Abrir treino ${esc(f2DisplayName(w.name))}">
     <h3>${esc(f2DisplayName(w.name))}</h3>
     <div class="exercise-count">${workoutExerciseCount(w)} exercícios</div>
+    <button class="training-delete card-delete"
+      onclick="event.stopPropagation();deleteMyWorkout('${w.id}')"
+      aria-label="Excluir treino" title="Excluir treino">×</button>
     <div class="card-actions">
       <button class="primary icon-action" onclick="event.stopPropagation();startWorkoutById('${w.id}')" aria-label="Iniciar treino" title="Iniciar treino">▶</button>
       <button class="secondary icon-action" onclick="event.stopPropagation();editMyWorkout('${w.id}')" aria-label="Editar treino" title="Editar treino">✎</button>
-      <button class="training-delete icon-action" onclick="event.stopPropagation();deleteMyWorkout('${w.id}')" aria-label="Excluir treino" title="Excluir treino">🗑</button>
     </div>
   </article>`).join("");
   layout(`<div class="training-grid">${cards||'<div class="empty big">Nenhum treino ativo.</div>'}</div>` ,"trainings");
 }
-function createMyWorkout(){
-  const name=prompt("Nome do treino:","Treino Personalizado"); if(!name?.trim())return;
-  const level=prompt("Nível (Básico, Intermediário, Avançado ou Personalizado):","Personalizado")||"Personalizado";
-  const w=normalizeWorkout({id:uid("treino-"),name:name.trim(),level,description:"",groups:[]});
-  db.myWorkouts.push(w); save(); editMyWorkout(w.id);
+function renderNewWorkout(){
+  layout(`
+    <button class="back edit-back" onclick="go('home')" aria-label="Voltar" title="Voltar">
+      <span aria-hidden="true">←</span><span>Início</span>
+    </button>
+
+    <div class="detail-head edit-detail-head">
+      <div>
+        <h2>Novo Treino</h2>
+        <p>Cadastre as informações básicas do seu novo treino.</p>
+      </div>
+    </div>
+
+    <section class="settings-card new-workout-form">
+      <label>Nome
+        <input id="newWorkoutName" maxlength="80" placeholder="Ex.: Treino de Peito e Tríceps" autocomplete="off">
+      </label>
+
+      <label>Descrição
+        <textarea id="newWorkoutDescription" rows="2" maxlength="180" placeholder="Opcional"></textarea>
+      </label>
+
+      <label>Nível
+        <select id="newWorkoutLevel">
+          ${['Básico','Intermediário','Avançado','Personalizado'].map(x=>`<option>${x}</option>`).join('')}
+        </select>
+      </label>
+    </section>
+
+    <p class="form-hint">Depois de criar o treino, você poderá adicionar grupos musculares e exercícios na tela de edição.</p>
+
+    <button class="primary full" onclick="createMyWorkoutFromForm()">＋ Criar Treino</button>
+  `,'training-new');
 }
+
+function createMyWorkoutFromForm(){
+  const name=document.getElementById('newWorkoutName')?.value.trim();
+  if(!name){
+    alert("Informe o nome do treino.");
+    document.getElementById('newWorkoutName')?.focus();
+    return;
+  }
+
+  const w=normalizeWorkout({
+    id:uid("treino-"),
+    name,
+    level:document.getElementById('newWorkoutLevel')?.value||"Personalizado",
+    description:document.getElementById('newWorkoutDescription')?.value.trim()||"",
+    groups:[]
+  });
+
+  db.myWorkouts.push(w);
+  saveMyWorkouts();
+  editMyWorkout(w.id);
+}
+
+function createMyWorkout(){ renderNewWorkout(); }
 function editMyWorkout(id){
   const w=getMyWorkout(id); if(!w)return;
   const legacyDescription = "Treino migrado da versão anterior";
@@ -1036,5 +1089,66 @@ function calendarDay(iso){const ws=(db.workoutHistory||[]).filter(w=>w.date===is
 function showWorkoutDetails(id){const h=(db.workoutHistory||[]).find(x=>x.id===id)|| (db.workouts||[]).find(x=>x.id===id);if(!h)return;const w=h.workoutSnapshot||h;layout(`<button class="back" onclick="calendarDay('${h.date}')">‹ Voltar</button><span class="pill">✓ TREINO CONCLUÍDO</span><h2>${esc(f2DisplayName(h.name||w.type))}</h2><div class="stats"><div><b>${dateBR(h.date)}</b><span>data</span></div><div><b>${fmt(h.totalTime||0)}</b><span>tempo</span></div><div><b>${h.totalSets||0}</b><span>séries</span></div></div><div class="section">${(w.exercises||[]).map((e,i)=>`<div class="exercise-row"><div><b>${i+1}. ${esc(f2DisplayName(e.name))}</b><small>${(e.sets||[]).filter(s=>s.done).length} séries concluídas</small></div></div>`).join('')}</div>`,'calendar');}
 function renderHistory(){const list=[...(db.workoutHistory||[])].reverse();layout(`<h2>Histórico</h2><p class="muted">${list.length} treino(s) concluído(s).</p>${list.length?`<div class="list">${list.map(w=>`<button class="list-card" onclick="showWorkoutDetails('${w.id}')"><span class="badge">✓</span><div><b>${esc(f2DisplayName(w.name))}</b><small>${dateBR(w.date)} • ${fmt(w.totalTime)} • ${w.completedExercises||0} exercícios</small></div><span>›</span></button>`).join('')}</div>`:'<div class="empty big">Ainda não há treinos concluídos.</div>'}`,'history');}
 function manualRegister(date,type){const w=db.myWorkouts?.find(x=>x.id===`legacy-${type}`);if(!w)return;const id=uid('hist-');db.workoutHistory.push({id,workoutId:w.id,name:w.name,date,executionDate:date,startedAt:null,completedAt:null,totalTime:0,completedExercises:workoutExerciseCount(w),totalSets:workoutSetTotal(w),manual:true,workoutSnapshot:{type:w.name,date,exercises:flattenMyWorkout(w)}});save();calendarDay(date);}
-// Home passa a destacar os treinos criados pelo usuário.
-function renderHome(){ensurePhase2Data();const recent=[...(db.workoutHistory||[])].slice(-1)[0],month=todayISO().slice(0,7),count=(db.workoutHistory||[]).filter(w=>w.date.startsWith(month)).length,total=(db.workoutHistory||[]).reduce((a,w)=>a+(w.totalTime||0),0);layout(`<section class="hero"><div><span class="pill">MEU TREINO</span><h2>Pronto para treinar?</h2><p>Escolha um treino e execute série por série.</p></div><div class="hero-icon">⚡</div></section><div class="stats"><div><b>${count}</b><span>treinos no mês</span></div><div><b>${fmtShort(total)}</b><span>tempo total</span></div><div><b>${recent?esc(f2DisplayName(recent.name)):'—'}</b><span>último treino</span></div></div><div class="home-training-head"><span>Treinos disponíveis</span><button class="secondary compact" onclick="go('trainings')">Ver todos</button></div><div class="training-grid">${db.myWorkouts.filter(w=>w.active!==false).slice(0,3).map(w=>`<article class="training-card ${f2LevelClass(w.level)}" onclick="startWorkoutById('${w.id}')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();startWorkoutById('${w.id}')}" aria-label="Abrir treino ${esc(f2DisplayName(w.name))}"><h3>${esc(f2DisplayName(w.name))}</h3><div class="exercise-count">${workoutExerciseCount(w)} exercícios</div><div class="card-actions"><button class="primary icon-action" onclick="event.stopPropagation();startWorkoutById('${w.id}')" aria-label="Iniciar treino" title="Iniciar treino">▶</button><button class="secondary icon-action" onclick="event.stopPropagation();editMyWorkout('${w.id}')" aria-label="Editar treino" title="Editar treino">✎</button><button class="training-delete icon-action" onclick="event.stopPropagation();deleteMyWorkout('${w.id}')" aria-label="Excluir treino" title="Excluir treino">🗑</button></div></article>`).join('')}</div>${recent?`<section class="recent"><div><span class="eyebrow">ÚLTIMO TREINO</span><h3>${esc(f2DisplayName(recent.name))} • ${dateBR(recent.date)}</h3><p>${fmt(recent.totalTime||0)} • ${recent.completedExercises||0} exercícios</p></div><button class="secondary" onclick="showWorkoutDetails('${recent.id}')">Detalhes</button></section>`:''}`,'home');}
+// Home: interface compacta, sem banner, com acesso direto ao cadastro de novo treino.
+function renderHome(){
+  ensurePhase2Data();
+  const recent=[...(db.workoutHistory||[])].slice(-1)[0],
+        month=todayISO().slice(0,7),
+        count=(db.workoutHistory||[]).filter(w=>w.date.startsWith(month)).length,
+        total=(db.workoutHistory||[]).reduce((a,w)=>a+(w.totalTime||0),0);
+
+  layout(`
+    <div class="stats">
+      <div><b>${count}</b><span>treinos no mês</span></div>
+      <div><b>${fmtShort(total)}</b><span>tempo total</span></div>
+      <div><b>${recent?esc(f2DisplayName(recent.name)):'—'}</b><span>último treino</span></div>
+    </div>
+
+    <div class="home-training-head">
+      <span>Treinos disponíveis</span>
+      <button class="secondary compact home-add-btn" onclick="renderNewWorkout()" aria-label="Cadastrar novo treino" title="Novo treino">+</button>
+    </div>
+
+    <div class="training-grid">
+      ${db.myWorkouts.filter(w=>w.active!==false).slice(0,3).map(w=>`
+        <article class="training-card f2-card ${f2LevelClass(w.level)}"
+          onclick="startWorkoutById('${w.id}')"
+          role="button"
+          tabindex="0"
+          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();startWorkoutById('${w.id}')}"
+          aria-label="Abrir treino ${esc(f2DisplayName(w.name))}">
+          <button class="training-delete card-delete"
+            onclick="event.stopPropagation();deleteMyWorkout('${w.id}')"
+            aria-label="Excluir treino"
+            title="Excluir treino">×</button>
+
+          <h3>${esc(f2DisplayName(w.name))}</h3>
+          <div class="exercise-count">${workoutExerciseCount(w)} exercícios</div>
+
+          <div class="card-actions">
+            <button class="primary icon-action"
+              onclick="event.stopPropagation();startWorkoutById('${w.id}')"
+              aria-label="Iniciar treino"
+              title="Iniciar treino">▶</button>
+
+            <button class="secondary icon-action"
+              onclick="event.stopPropagation();editMyWorkout('${w.id}')"
+              aria-label="Editar treino"
+              title="Editar treino">✎</button>
+          </div>
+        </article>
+      `).join('')}
+    </div>
+
+    ${recent?`
+      <section class="recent">
+        <div>
+          <span class="eyebrow">ÚLTIMO TREINO</span>
+          <h3>${esc(f2DisplayName(recent.name))} • ${dateBR(recent.date)}</h3>
+          <p>${fmt(recent.totalTime||0)} • ${recent.completedExercises||0} exercícios</p>
+        </div>
+        <button class="secondary" onclick="showWorkoutDetails('${recent.id}')">Detalhes</button>
+      </section>
+    `:''}
+  `,'home');
+}

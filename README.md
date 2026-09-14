@@ -80,3 +80,15 @@ Corrigida a tela de execução para preservar as séries e repetições prescrit
 - Check de série concluída centralizado e não interativo.
 - Textos corrigidos para "Série em Execução", "Iniciar Próxima Série" e "Iniciar Série".
 - Removido o texto "30s entre séries" da interface, mantendo o descanso automático de 30 segundos.
+
+## v32 — UX/UI Tela Inicial
+- Removido o banner superior com o raio da tela inicial.
+- Indicadores reposicionados imediatamente após o cabeçalho.
+- `Ver todos` substituído por botão `+` na seção Treinos disponíveis.
+- `+` abre uma tela nativa de cadastro de novo treino.
+- Cards com `×` vermelho no canto superior direito para exclusão.
+- `▶` Iniciar posicionado no canto inferior esquerdo.
+- `✎` Editar posicionado no canto inferior direito.
+- Mantida a confirmação de exclusão e o histórico dos treinos.
+- Layout responsivo para telas pequenas.
+- Cache do Service Worker atualizado para v32.

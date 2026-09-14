@@ -125,6 +125,130 @@ button:disabled{opacity:.45;cursor:not-allowed;transform:none!important}
 @media(max-width:380px){.training-card{padding:14px}.card-actions{gap:8px}.card-actions .icon-action{width:42px;height:42px;min-width:42px;min-height:42px}}
 
 
+
+/* v32 - UX/UI da tela inicial e cards de treino */
+.training-card.f2-card{
+  position:relative;
+  min-height:178px;
+  padding:18px 18px 76px;
+  overflow:hidden;
+}
+
+.training-card.f2-card h3{
+  margin:8px 38px 8px 0;
+  padding-right:0;
+  overflow-wrap:anywhere;
+}
+
+.training-card.f2-card .exercise-count{
+  display:block;
+  font-size:13px;
+  font-weight:700;
+  color:var(--muted,#6b7280);
+}
+
+.training-card.f2-card .card-actions{
+  position:absolute;
+  left:18px;
+  right:18px;
+  bottom:16px;
+  margin:0;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  pointer-events:none;
+}
+
+.training-card.f2-card .card-actions .icon-action{
+  flex:0 0 44px;
+  width:44px;
+  height:44px;
+  min-width:44px;
+  min-height:44px;
+  padding:0;
+  border-radius:12px;
+  display:grid;
+  place-items:center;
+  font-size:18px;
+  line-height:1;
+  pointer-events:auto;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
+
+.training-card.f2-card .card-delete{
+  position:absolute;
+  top:10px;
+  right:10px;
+  width:34px;
+  height:34px;
+  min-width:34px;
+  min-height:34px;
+  padding:0;
+  border-radius:10px;
+  display:grid;
+  place-items:center;
+  background:rgba(255,255,255,.72);
+  border:1px solid rgba(185,28,28,.12);
+  color:#dc2626;
+  font-size:22px;
+  font-weight:800;
+  line-height:1;
+  z-index:3;
+  box-shadow:0 2px 8px rgba(23,33,43,.05);
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
+
+.training-card.f2-card .card-delete:active{
+  transform:scale(.94);
+  background:#fff0f0;
+}
+
+.home-add-btn{
+  width:40px;
+  height:40px;
+  min-width:40px;
+  min-height:40px;
+  padding:0;
+  border-radius:12px;
+  display:grid;
+  place-items:center;
+  font-size:26px;
+  font-weight:500;
+  line-height:1;
+}
+
+.new-workout-form{
+  gap:14px;
+}
+
+@media(max-width:380px){
+  .training-card.f2-card{
+    min-height:172px;
+    padding:16px 14px 72px;
+  }
+
+  .training-card.f2-card .card-actions{
+    left:14px;
+    right:14px;
+    bottom:14px;
+  }
+
+  .training-card.f2-card .card-actions .icon-action{
+    width:42px;
+    height:42px;
+    min-width:42px;
+    min-height:42px;
+  }
+
+  .training-card.f2-card .card-delete{
+    top:8px;
+    right:8px;
+  }
+}
+
 /* v30 - UX/UI da tela de edição de treino */
 .edit-back{display:flex;align-items:center;gap:8px;min-height:44px;padding:4px 8px;margin:0 0 6px;border-radius:12px}
 .edit-back span:first-child{font-size:26px;line-height:1}
