@@ -103,6 +103,11 @@ button:disabled{opacity:.45;cursor:not-allowed;transform:none!important}
 .page-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0 18px}.page-title-row h3{margin:0}.primary.small{padding:10px 14px;font-size:13px}.card-actions{display:flex;justify-content:center;align-items:center;gap:10px;margin-top:14px}.card-actions>*{flex:0 0 44px}.f2-card{min-width:0}.f2-group{margin-bottom:12px}.f2-exercise{align-items:center}.f2-exercise>div:last-child{display:flex;gap:3px}.f2-group .page-title-row{margin-bottom:10px}.f2-group small{color:var(--muted,#6b7280)}
 .settings-card textarea{width:100%;box-sizing:border-box;resize:vertical;border:1px solid var(--border,#ddd);border-radius:10px;padding:10px;font:inherit;background:var(--surface,#fff)}
 
+/* Padronização dos campos de texto dos formulários de treino */
+.settings-card input:not([type]),.settings-card input[type="text"]{display:block;width:100%;box-sizing:border-box;margin-top:6px;min-height:50px;border:1px solid var(--line);border-radius:13px;padding:0 14px;background:#f8fafb;color:var(--ink);font:inherit;outline:none;-webkit-appearance:none;appearance:none}
+.settings-card input:not([type]):focus,.settings-card input[type="text"]:focus{border-color:var(--accent2);box-shadow:0 0 0 3px rgba(40,160,90,.10)}
+.settings-card input:not([type]):active,.settings-card input[type="text"]:active{border-color:var(--accent2)}
+
 
 /* Melhorias UX/UI - Tela de Treinos */
  .training-card{position:relative;overflow:hidden;transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
