@@ -126,143 +126,347 @@ button:disabled{opacity:.45;cursor:not-allowed;transform:none!important}
 
 
 
-/* v32 - UX/UI da tela inicial e cards de treino */
+/* v33 - Cards premium inspirados no design de referência */
 .training-card.f2-card{
   position:relative;
-  min-height:178px;
-  padding:18px 18px 76px;
+  min-height:226px;
+  padding:26px 26px 88px;
   overflow:hidden;
+  isolation:isolate;
+  background:linear-gradient(135deg,#f7faff 0%,#f2f6fd 100%);
+  border:1px solid #dbe7f5;
+  border-radius:30px;
+  box-shadow:0 14px 34px rgba(38,58,84,.08);
+  transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;
+}
+
+.training-card.f2-card:hover{
+  box-shadow:0 18px 40px rgba(38,58,84,.11);
+  border-color:#d1e0f2;
+}
+
+.training-card.f2-card:active{
+  transform:scale(.992);
+}
+
+.training-card.f2-card .f2-card-main{
+  position:relative;
+  z-index:2;
+  display:flex;
+  align-items:flex-start;
+  gap:18px;
+}
+
+.training-card.f2-card .f2-workout-icon{
+  flex:0 0 72px;
+  width:72px;
+  height:72px;
+  border-radius:22px;
+  display:grid;
+  place-items:center;
+  background:#dcebfb;
+  box-shadow:inset 0 0 0 1px rgba(104,153,205,.08);
+}
+
+.training-card.f2-card .f2-workout-icon svg{
+  width:47px;
+  height:47px;
+  fill:#101a2b;
+  transform:rotate(-10deg);
+}
+
+.training-card.f2-card .f2-card-info{
+  min-width:0;
+  padding-top:2px;
 }
 
 .training-card.f2-card h3{
-  margin:8px 38px 8px 0;
-  padding-right:0;
+  margin:0 46px 5px 0;
+  padding:0;
+  color:#101a2b;
+  font-size:28px;
+  line-height:1.12;
+  font-weight:800;
+  letter-spacing:-.025em;
   overflow-wrap:anywhere;
 }
 
 .training-card.f2-card .exercise-count{
   display:block;
-  font-size:13px;
-  font-weight:700;
-  color:var(--muted,#6b7280);
-}
-
-.training-card.f2-card .card-actions{
-  position:absolute;
-  left:18px;
-  right:18px;
-  bottom:16px;
   margin:0;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:10px;
-  pointer-events:none;
+  color:#6f7d8c;
+  font-size:17px;
+  line-height:1.35;
+  font-weight:700;
 }
 
-.training-card.f2-card .card-actions .icon-action{
-  flex:0 0 44px;
-  width:44px;
-  height:44px;
-  min-width:44px;
-  min-height:44px;
-  padding:0;
-  border-radius:12px;
-  display:grid;
-  place-items:center;
-  font-size:18px;
+.training-card.f2-card .f2-level-pill{
+  width:max-content;
+  max-width:100%;
+  margin-top:22px;
+  padding:9px 14px;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  border-radius:999px;
+  background:#e4edff;
+  color:#3d66b5;
+  font-size:14px;
   line-height:1;
-  pointer-events:auto;
-  touch-action:manipulation;
-  -webkit-tap-highlight-color:transparent;
+  font-weight:800;
+}
+
+.training-card.f2-card .f2-level-pill svg{
+  width:20px;
+  height:20px;
+  flex:0 0 20px;
+  fill:currentColor;
+}
+
+.training-card.f2-card .f2-card-watermark{
+  position:absolute;
+  z-index:1;
+  right:52px;
+  top:32px;
+  width:175px;
+  height:175px;
+  opacity:.035;
+  pointer-events:none;
+  transform:rotate(-28deg);
+}
+
+.training-card.f2-card .f2-card-watermark svg{
+  width:100%;
+  height:100%;
+  fill:#3d66b5;
 }
 
 .training-card.f2-card .card-delete{
   position:absolute;
-  top:10px;
-  right:10px;
-  width:34px;
-  height:34px;
-  min-width:34px;
-  min-height:34px;
+  z-index:4;
+  top:14px;
+  right:14px;
+  width:48px;
+  height:48px;
+  min-width:48px;
+  min-height:48px;
   padding:0;
-  border-radius:10px;
+  border-radius:17px;
   display:grid;
   place-items:center;
-  background:rgba(255,255,255,.72);
-  border:1px solid rgba(185,28,28,.12);
-  color:#dc2626;
-  font-size:22px;
+  background:rgba(255,255,255,.88);
+  border:1px solid rgba(218,79,79,.16);
+  color:#d52b2b;
+  font-size:32px;
   font-weight:800;
   line-height:1;
-  z-index:3;
-  box-shadow:0 2px 8px rgba(23,33,43,.05);
+  box-shadow:0 5px 14px rgba(70,31,31,.07);
   touch-action:manipulation;
   -webkit-tap-highlight-color:transparent;
 }
 
 .training-card.f2-card .card-delete:active{
-  transform:scale(.94);
-  background:#fff0f0;
+  transform:scale(.93);
+  background:#fff1f1;
 }
 
-.home-add-btn{
-  width:40px;
-  height:40px;
-  min-width:40px;
-  min-height:40px;
-  padding:0;
-  border-radius:12px;
-  display:grid;
-  place-items:center;
-  font-size:26px;
-  font-weight:500;
+.training-card.f2-card .f2-card-actions{
+  position:absolute;
+  z-index:3;
+  left:26px;
+  right:26px;
+  bottom:22px;
+  margin:0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  pointer-events:none;
+}
+
+.training-card.f2-card .f2-card-actions button{
+  pointer-events:auto;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
+
+.training-card.f2-card .f2-start-action{
+  min-width:154px;
+  min-height:58px;
+  padding:0 26px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:16px;
+  border-radius:19px;
+  background:#10192b;
+  color:#fff;
+  font-size:18px;
+  font-weight:800;
+  box-shadow:0 8px 18px rgba(16,25,43,.13);
+}
+
+.training-card.f2-card .f2-play-icon{
+  font-size:23px;
   line-height:1;
 }
 
-.new-workout-form{
-  gap:14px;
+.training-card.f2-card .f2-start-action:active{
+  transform:translateY(1px);
+  box-shadow:0 4px 10px rgba(16,25,43,.12);
 }
 
-@media(max-width:380px){
+.training-card.f2-card .f2-edit-action{
+  width:86px;
+  min-width:86px;
+  height:72px;
+  min-height:72px;
+  padding:8px 10px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  border-radius:22px;
+  background:rgba(255,255,255,.92);
+  color:#536273;
+  border:1px solid #dbe4ed;
+  box-shadow:0 6px 16px rgba(38,58,84,.07);
+  font-size:13px;
+  font-weight:800;
+}
+
+.training-card.f2-card .f2-edit-icon{
+  font-size:28px;
+  line-height:1;
+  color:#263548;
+}
+
+.training-card.f2-card .f2-edit-action:active{
+  transform:translateY(1px);
+  background:#fff;
+}
+
+.training-card.f2-card.level-intermediate{
+  background:linear-gradient(135deg,#f7fbf8 0%,#f2f8f5 100%);
+  border-color:#dcece2;
+}
+
+.training-card.f2-card.level-advanced{
+  background:linear-gradient(135deg,#fffdf7 0%,#fbf8f0 100%);
+  border-color:#eee6d0;
+}
+
+.training-card.f2-card.level-custom{
+  background:linear-gradient(135deg,#faf9ff 0%,#f5f6fd 100%);
+  border-color:#e2e4f2;
+}
+
+@media(max-width:480px){
   .training-card.f2-card{
-    min-height:172px;
-    padding:16px 14px 72px;
+    min-height:218px;
+    padding:22px 20px 82px;
+    border-radius:27px;
   }
 
-  .training-card.f2-card .card-actions{
-    left:14px;
-    right:14px;
-    bottom:14px;
+  .training-card.f2-card .f2-card-main{
+    gap:14px;
   }
 
-  .training-card.f2-card .card-actions .icon-action{
-    width:42px;
-    height:42px;
-    min-width:42px;
-    min-height:42px;
+  .training-card.f2-card .f2-workout-icon{
+    flex-basis:62px;
+    width:62px;
+    height:62px;
+    border-radius:19px;
+  }
+
+  .training-card.f2-card .f2-workout-icon svg{
+    width:40px;
+    height:40px;
+  }
+
+  .training-card.f2-card h3{
+    margin-right:36px;
+    font-size:24px;
+  }
+
+  .training-card.f2-card .exercise-count{
+    font-size:15px;
+  }
+
+  .training-card.f2-card .f2-level-pill{
+    margin-top:16px;
+    padding:8px 12px;
+    font-size:13px;
+  }
+
+  .training-card.f2-card .f2-card-watermark{
+    right:24px;
+    top:46px;
+    width:145px;
+    height:145px;
   }
 
   .training-card.f2-card .card-delete{
-    top:8px;
-    right:8px;
+    top:11px;
+    right:11px;
+    width:44px;
+    height:44px;
+    min-width:44px;
+    min-height:44px;
+    border-radius:15px;
+    font-size:29px;
+  }
+
+  .training-card.f2-card .f2-card-actions{
+    left:20px;
+    right:20px;
+    bottom:17px;
+    gap:10px;
+  }
+
+  .training-card.f2-card .f2-start-action{
+    min-width:136px;
+    min-height:54px;
+    padding:0 20px;
+    border-radius:17px;
+    gap:13px;
+    font-size:17px;
+  }
+
+  .training-card.f2-card .f2-edit-action{
+    width:76px;
+    min-width:76px;
+    height:62px;
+    min-height:62px;
+    border-radius:19px;
   }
 }
 
-/* v30 - UX/UI da tela de edição de treino */
-.edit-back{display:flex;align-items:center;gap:8px;min-height:44px;padding:4px 8px;margin:0 0 6px;border-radius:12px}
-.edit-back span:first-child{font-size:26px;line-height:1}
-.edit-detail-head{margin:0 0 14px;padding-left:2px}
-.edit-detail-head h2{font-size:24px;margin:0}
-.settings-card label{display:block;font-size:12px;font-weight:800;color:var(--ink)}
-.settings-card label input,.settings-card label textarea,.settings-card label select{display:block;width:100%;box-sizing:border-box;margin-top:7px;min-height:50px;border:1px solid var(--line);border-radius:13px;padding:10px 14px;background:#f8fafb;color:var(--ink);font-size:15px;outline:none}
-.settings-card label textarea{min-height:72px;resize:vertical;line-height:1.4}
-.settings-card label input:focus,.settings-card label textarea:focus,.settings-card label select:focus{border-color:var(--accent2);box-shadow:0 0 0 3px rgba(40,160,90,.10)}
-.groups-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 0 8px}
-.groups-title-row h3{margin:0;font-size:19px}
-.group-add-btn{flex:0 0 44px;width:44px;height:44px;font-size:24px}
-.f2-actions{display:flex;align-items:center;gap:3px;flex:0 0 auto}
-.f2-actions .iconbtn{width:38px;height:38px;border-radius:11px;font-size:17px}
-.f2-exercise .f2-actions{margin-left:6px}
-.f2-group .page-title-row{align-items:center}
-@media(max-width:380px){.f2-actions .iconbtn{width:36px;height:36px}.f2-exercise .f2-actions{gap:1px;margin-left:3px}.groups-title-row h3{font-size:18px}}
+@media(max-width:350px){
+  .training-card.f2-card{
+    min-height:210px;
+    padding-left:16px;
+    padding-right:16px;
+  }
+
+  .training-card.f2-card .f2-workout-icon{
+    flex-basis:56px;
+    width:56px;
+    height:56px;
+  }
+
+  .training-card.f2-card h3{
+    font-size:22px;
+  }
+
+  .training-card.f2-card .f2-card-actions{
+    left:16px;
+    right:16px;
+  }
+
+  .training-card.f2-card .f2-start-action{
+    min-width:128px;
+    padding:0 16px;
+  }
+}

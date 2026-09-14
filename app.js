@@ -372,10 +372,14 @@ function renderHome(){
   `,"home");
 }
 function renderTrainings(){
-  layout(`<h2>Treinos A, B e C</h2><p class="muted">Toque em um treino para ver todos os exercícios.</p>
-    <div class="list">${["A","B","C"].map(c=>`<button class="list-card" onclick="viewTraining('${c}')"><span class="badge">${c}</span><div><b>${esc(trainingName(c))}</b><small>${TRAININGS[c].muscles.join(" • ")}</small></div><span>›</span></button>`).join("")}</div>`,"trainings");
-}
+  ensurePhase2Data();
+  const cards=db.myWorkouts
+    .filter(w=>w.active!==false)
+    .map(f2WorkoutCard)
+    .join("");
 
+  layout(`<div class="training-grid">${cards||'<div class="empty big">Nenhum treino ativo.</div>'}</div>` ,"trainings");
+}
 function customizeTraining(code){ ensureWorkoutPlan(code); editTraining(code); }
 function editTraining(code){
   const plan=ensureWorkoutPlan(code);
@@ -927,6 +931,89 @@ function f2LevelClass(level){
   if(key.includes("avancado"))return "level-advanced";
   return "level-custom";
 }
+function f2LevelLabel(level){
+  const key=String(level||"Personalizado").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+  if(key.includes("basico"))return "Básico";
+  if(key.includes("intermediario"))return "Intermediário";
+  if(key.includes("avancado"))return "Avançado";
+  return "Personalizado";
+}
+
+function f2WorkoutCard(w){
+  const name=f2DisplayName(w.name);
+  const count=workoutExerciseCount(w);
+  const level=f2LevelLabel(w.level);
+  return `
+    <article class="training-card f2-card ${f2LevelClass(w.level)}"
+      onclick="startWorkoutById('${w.id}')"
+      role="button"
+      tabindex="0"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();startWorkoutById('${w.id}')}"
+      aria-label="Abrir treino ${esc(name)}">
+
+      <button class="training-delete card-delete"
+        onclick="event.stopPropagation();deleteMyWorkout('${w.id}')"
+        aria-label="Excluir treino"
+        title="Excluir treino">×</button>
+
+      <div class="f2-card-main">
+        <div class="f2-workout-icon" aria-hidden="true">
+          <svg viewBox="0 0 64 64" focusable="false">
+            <rect x="10" y="25" width="8" height="14" rx="3"></rect>
+            <rect x="18" y="20" width="7" height="24" rx="3"></rect>
+            <rect x="25" y="28" width="14" height="8" rx="4" transform="rotate(-28 32 32)"></rect>
+            <rect x="39" y="20" width="7" height="24" rx="3"></rect>
+            <rect x="46" y="25" width="8" height="14" rx="3"></rect>
+          </svg>
+        </div>
+
+        <div class="f2-card-info">
+          <h3>${esc(name)}</h3>
+          <div class="exercise-count">${count} ${count===1?'exercício':'exercícios'}</div>
+
+          <div class="f2-level-pill">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="4" y="13" width="4" height="7" rx="1"></rect>
+              <rect x="10" y="9" width="4" height="11" rx="1"></rect>
+              <rect x="16" y="4" width="4" height="16" rx="1"></rect>
+            </svg>
+            <span>${esc(level)}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="f2-card-watermark" aria-hidden="true">
+        <svg viewBox="0 0 180 180" focusable="false">
+          <g>
+            <rect x="72" y="12" width="36" height="156" rx="18"></rect>
+            <rect x="42" y="28" width="28" height="124" rx="14"></rect>
+            <rect x="110" y="28" width="28" height="124" rx="14"></rect>
+            <rect x="18" y="48" width="18" height="84" rx="9"></rect>
+            <rect x="144" y="48" width="18" height="84" rx="9"></rect>
+          </g>
+        </svg>
+      </div>
+
+      <div class="card-actions f2-card-actions">
+        <button class="primary f2-start-action"
+          onclick="event.stopPropagation();startWorkoutById('${w.id}')"
+          aria-label="Iniciar treino"
+          title="Iniciar treino">
+          <span class="f2-play-icon" aria-hidden="true">▶</span>
+          <span>Iniciar</span>
+        </button>
+
+        <button class="secondary f2-edit-action"
+          onclick="event.stopPropagation();editMyWorkout('${w.id}')"
+          aria-label="Editar treino"
+          title="Editar treino">
+          <span class="f2-edit-icon" aria-hidden="true">✎</span>
+          <span>Editar</span>
+        </button>
+      </div>
+    </article>`;
+}
+
 function deleteMyWorkout(id){
   const w=getMyWorkout(id);
   if(!w)return;
@@ -1097,6 +1184,12 @@ function renderHome(){
         count=(db.workoutHistory||[]).filter(w=>w.date.startsWith(month)).length,
         total=(db.workoutHistory||[]).reduce((a,w)=>a+(w.totalTime||0),0);
 
+  const cards=db.myWorkouts
+    .filter(w=>w.active!==false)
+    .slice(0,3)
+    .map(f2WorkoutCard)
+    .join("");
+
   layout(`
     <div class="stats">
       <div><b>${count}</b><span>treinos no mês</span></div>
@@ -1110,34 +1203,7 @@ function renderHome(){
     </div>
 
     <div class="training-grid">
-      ${db.myWorkouts.filter(w=>w.active!==false).slice(0,3).map(w=>`
-        <article class="training-card f2-card ${f2LevelClass(w.level)}"
-          onclick="startWorkoutById('${w.id}')"
-          role="button"
-          tabindex="0"
-          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();startWorkoutById('${w.id}')}"
-          aria-label="Abrir treino ${esc(f2DisplayName(w.name))}">
-          <button class="training-delete card-delete"
-            onclick="event.stopPropagation();deleteMyWorkout('${w.id}')"
-            aria-label="Excluir treino"
-            title="Excluir treino">×</button>
-
-          <h3>${esc(f2DisplayName(w.name))}</h3>
-          <div class="exercise-count">${workoutExerciseCount(w)} exercícios</div>
-
-          <div class="card-actions">
-            <button class="primary icon-action"
-              onclick="event.stopPropagation();startWorkoutById('${w.id}')"
-              aria-label="Iniciar treino"
-              title="Iniciar treino">▶</button>
-
-            <button class="secondary icon-action"
-              onclick="event.stopPropagation();editMyWorkout('${w.id}')"
-              aria-label="Editar treino"
-              title="Editar treino">✎</button>
-          </div>
-        </article>
-      `).join('')}
+      ${cards||'<div class="empty big">Nenhum treino ativo.</div>'}
     </div>
 
     ${recent?`

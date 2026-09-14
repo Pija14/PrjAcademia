@@ -92,3 +92,16 @@ Corrigida a tela de execução para preservar as séries e repetições prescrit
 - Mantida a confirmação de exclusão e o histórico dos treinos.
 - Layout responsivo para telas pequenas.
 - Cache do Service Worker atualizado para v32.
+
+## v33 — Redesign dos Cards
+- Cards da tela inicial e da tela Treinos alinhados ao design visual de referência.
+- Ícone de musculação em bloco azul claro.
+- Título e quantidade de exercícios com hierarquia visual maior.
+- Nível apresentado como pill quando disponível.
+- Marca d'água decorativa construída em SVG/CSS, sem uso da imagem de referência.
+- Exclusão com `×` vermelho no canto superior direito.
+- `Iniciar` como CTA principal no canto inferior esquerdo.
+- `Editar` como ação secundária no canto inferior direito.
+- Renderização dos cards centralizada em `f2WorkoutCard()` para evitar duplicação.
+- Responsividade refinada para 320px, 350px, 480px e telas maiores.
+- Cache do Service Worker atualizado para v33.
