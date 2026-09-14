@@ -113,6 +113,6 @@ Corrigida a tela de execução para preservar as séries e repetições prescrit
 - Ações ancoradas: Iniciar inferior esquerdo, Editar inferior direito e X superior direito.
 
 
-## v35 — Campo Nome padronizado
+## v36 — Campo Nome padronizado
 - Campo Nome da tela de edição/novo treino padronizado visualmente com os demais campos do formulário.
 - Mantidos dados, navegação e demais funcionalidades.
