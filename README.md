@@ -61,3 +61,15 @@ Corrigida a tela de execução para preservar as séries e repetições prescrit
 - Ícone de lixeira separado do clique do card via `stopPropagation`.
 - Padronização visual de nomes de treinos, grupos e exercícios.
 - Cache do Service Worker atualizado para v29.
+
+
+## v30 - UX/UI Tela de Edição de Treino
+- Removido o botão + da barra superior somente da tela de edição.
+- Removido o nível ao lado do nome do treino e o texto de migração da interface.
+- Adicionado botão de voltar para Treinos.
+- Padronizado o campo Nome.
+- Renomeado Grupos Musculares e adicionado botão + somente com ícone.
+- Removida a ação Duplicar treino da tela de edição.
+- Salvar Treino retorna para a tela de Treinos após salvar.
+- Ajustados os textos Adicionar Exercício e Salvar Treino.
+- Cache do Service Worker atualizado para v30.

@@ -123,3 +123,22 @@ button:disabled{opacity:.45;cursor:not-allowed;transform:none!important}
 .home-training-head>span{font-size:12px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
 .home-training-head .compact{min-height:38px}
 @media(max-width:380px){.training-card{padding:14px}.card-actions{gap:8px}.card-actions .icon-action{width:42px;height:42px;min-width:42px;min-height:42px}}
+
+
+/* v30 - UX/UI da tela de edição de treino */
+.edit-back{display:flex;align-items:center;gap:8px;min-height:44px;padding:4px 8px;margin:0 0 6px;border-radius:12px}
+.edit-back span:first-child{font-size:26px;line-height:1}
+.edit-detail-head{margin:0 0 14px;padding-left:2px}
+.edit-detail-head h2{font-size:24px;margin:0}
+.settings-card label{display:block;font-size:12px;font-weight:800;color:var(--ink)}
+.settings-card label input,.settings-card label textarea,.settings-card label select{display:block;width:100%;box-sizing:border-box;margin-top:7px;min-height:50px;border:1px solid var(--line);border-radius:13px;padding:10px 14px;background:#f8fafb;color:var(--ink);font-size:15px;outline:none}
+.settings-card label textarea{min-height:72px;resize:vertical;line-height:1.4}
+.settings-card label input:focus,.settings-card label textarea:focus,.settings-card label select:focus{border-color:var(--accent2);box-shadow:0 0 0 3px rgba(40,160,90,.10)}
+.groups-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 0 8px}
+.groups-title-row h3{margin:0;font-size:19px}
+.group-add-btn{flex:0 0 44px;width:44px;height:44px;font-size:24px}
+.f2-actions{display:flex;align-items:center;gap:3px;flex:0 0 auto}
+.f2-actions .iconbtn{width:38px;height:38px;border-radius:11px;font-size:17px}
+.f2-exercise .f2-actions{margin-left:6px}
+.f2-group .page-title-row{align-items:center}
+@media(max-width:380px){.f2-actions .iconbtn{width:36px;height:36px}.f2-exercise .f2-actions{gap:1px;margin-left:3px}.groups-title-row h3{font-size:18px}}

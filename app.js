@@ -329,6 +329,7 @@ function totalExercises(code){ return flatTraining(code).length; }
 function monthLabel(y,m){ return new Intl.DateTimeFormat("pt-BR",{month:"long",year:"numeric"}).format(new Date(y,m,1)); }
 
 function layout(content, active="home"){
+  const navActive = active === "training-edit" ? "trainings" : active;
   const app=document.getElementById("app");
   if(!app) throw new Error("Elemento #app não encontrado.");
   app.innerHTML = `
@@ -338,10 +339,10 @@ function layout(content, active="home"){
     </header>
     <main>${content}</main>
     <nav class="bottomnav">
-      <button class="${active==='home'?'active':''}" onclick="go('home')"><span>⌂</span>Início</button>
-      <button class="${active==='calendar'?'active':''}" onclick="go('calendar')"><span>▦</span>Calendário</button>
-      <button class="${active==='trainings'?'active':''}" onclick="go('trainings')"><span>💪</span>Treinos</button>
-      <button class="${active==='history'?'active':''}" onclick="go('history')"><span>◷</span>Histórico</button>
+      <button class="${navActive==='home'?'active':''}" onclick="go('home')"><span>⌂</span>Início</button>
+      <button class="${navActive==='calendar'?'active':''}" onclick="go('calendar')"><span>▦</span>Calendário</button>
+      <button class="${navActive==='trainings'?'active':''}" onclick="go('trainings')"><span>💪</span>Treinos</button>
+      <button class="${navActive==='history'?'active':''}" onclick="go('history')"><span>◷</span>Histórico</button>
     </nav>
   </div>`;
 }
@@ -957,16 +958,23 @@ function createMyWorkout(){
 }
 function editMyWorkout(id){
   const w=getMyWorkout(id); if(!w)return;
-  const groups=w.groups.slice().sort((a,b)=>a.order-b.order).map((g,gi)=>`<section class="settings-card f2-group"><div class="page-title-row"><div><h3>${esc(f2DisplayName(g.name))}</h3><small>${g.exercises.length} exercício(s)</small></div><div><button class="iconbtn" onclick="moveMyGroup('${id}',${gi},-1)">↑</button><button class="iconbtn" onclick="moveMyGroup('${id}',${gi},1)">↓</button><button class="iconbtn" onclick="renameMyGroup('${id}','${g.id}')">✎</button><button class="iconbtn" onclick="removeMyGroup('${id}','${g.id}')">×</button></div></div>
-    ${g.exercises.slice().sort((a,b)=>a.order-b.order).map((e,ei)=>`<div class="exercise-row f2-exercise"><div><b>${ei+1}. ${esc(f2DisplayName(e.name))}</b><small>${e.seriesCount||e.sets.length||0} série(s)${e.equipment?' • '+esc(e.equipment):''}</small></div><div><button class="iconbtn" onclick="moveMyExercise('${id}','${g.id}','${e.id}',-1)">↑</button><button class="iconbtn" onclick="moveMyExercise('${id}','${g.id}','${e.id}',1)">↓</button><button class="iconbtn" onclick="configureMyExercise('${id}','${g.id}','${e.id}')">✎</button><button class="iconbtn" onclick="removeMyExercise('${id}','${g.id}','${e.id}')">×</button></div></div>`).join("")}
-    <button class="secondary full" onclick="addExerciseToMyGroup('${id}','${g.id}')">＋ Adicionar exercício</button></section>`).join("");
-  layout(`<button class="back" onclick="go('trainings')">‹ Meus Treinos</button><div class="detail-head"><span class="badge">${esc(f2DisplayName(w.level))}</span><div><h2>${esc(f2DisplayName(w.name))}</h2><p>${esc(w.description||'Configure seu treino')}</p></div></div>
-    <section class="settings-card"><label>Nome<input id="f2Name" value="${f2EscapeAttr(w.name)}"></label><label>Descrição<textarea id="f2Desc" rows="2">${esc(w.description)}</textarea></label><label>Nível<select id="f2Level">${['Básico','Intermediário','Avançado','Personalizado'].map(x=>`<option ${x===w.level?'selected':''}>${x}</option>`).join('')}</select></label></section>
-    <h3>Grupos musculares</h3>${groups||'<div class="empty">Adicione o primeiro grupo muscular.</div>'}
-    <div class="seg"><button class="secondary" onclick="addMyGroup('${id}')">＋ Grupo muscular</button><button class="secondary" onclick="duplicateMyWorkout('${id}')">⧉ Duplicar treino</button></div>
-    <button class="primary full" onclick="saveMyWorkoutHeader('${id}')">✓ Salvar treino</button>`,"trainings");
+  const legacyDescription = "Treino migrado da versão anterior";
+  const displayDescription = String(w.description||"").trim() === legacyDescription ? "" : String(w.description||"");
+  const groups=w.groups.slice().sort((a,b)=>a.order-b.order).map((g,gi)=>`<section class="settings-card f2-group"><div class="page-title-row"><div><h3>${esc(f2DisplayName(g.name))}</h3><small>${g.exercises.length} exercício(s)</small></div><div class="f2-actions" aria-label="Ações do grupo">
+      <button class="iconbtn" onclick="moveMyGroup('${id}',${gi},-1)" aria-label="Mover grupo para cima" title="Mover grupo para cima">↑</button>
+      <button class="iconbtn" onclick="moveMyGroup('${id}',${gi},1)" aria-label="Mover grupo para baixo" title="Mover grupo para baixo">↓</button>
+      <button class="iconbtn" onclick="renameMyGroup('${id}','${g.id}')" aria-label="Renomear grupo muscular" title="Renomear grupo muscular">✎</button>
+      <button class="iconbtn" onclick="removeMyGroup('${id}','${g.id}')" aria-label="Excluir grupo muscular" title="Excluir grupo muscular">×</button>
+    </div></div>
+    ${g.exercises.slice().sort((a,b)=>a.order-b.order).map((e,ei)=>`<div class="exercise-row f2-exercise"><div><b>${ei+1}. ${esc(f2DisplayName(e.name))}</b><small>${e.seriesCount||e.sets.length||0} série(s)${e.equipment?' • '+esc(e.equipment):''}</small></div><div class="f2-actions" aria-label="Ações do exercício"><button class="iconbtn" onclick="moveMyExercise('${id}','${g.id}','${e.id}',-1)" aria-label="Mover exercício para cima" title="Mover exercício para cima">↑</button><button class="iconbtn" onclick="moveMyExercise('${id}','${g.id}','${e.id}',1)" aria-label="Mover exercício para baixo" title="Mover exercício para baixo">↓</button><button class="iconbtn" onclick="configureMyExercise('${id}','${g.id}','${e.id}')" aria-label="Editar exercício" title="Editar exercício">✎</button><button class="iconbtn" onclick="removeMyExercise('${id}','${g.id}','${e.id}')" aria-label="Excluir exercício" title="Excluir exercício">×</button></div></div>`).join("")}
+    <button class="secondary full" onclick="addExerciseToMyGroup('${id}','${g.id}')">＋ Adicionar Exercício</button></section>`).join("");
+  layout(`<button class="back edit-back" onclick="go('trainings')" aria-label="Voltar" title="Voltar"><span aria-hidden="true">←</span><span>Meus Treinos</span></button><div class="detail-head edit-detail-head"><div><h2>${esc(f2DisplayName(w.name))}</h2></div></div>
+    <section class="settings-card"><label>Nome<input id="f2Name" value="${f2EscapeAttr(w.name)}"></label><label>Descrição<textarea id="f2Desc" rows="2">${esc(displayDescription)}</textarea></label><label>Nível<select id="f2Level">${['Básico','Intermediário','Avançado','Personalizado'].map(x=>`<option ${x===w.level?'selected':''}>${x}</option>`).join('')}</select></label></section>
+    <div class="groups-title-row"><h3>Grupos Musculares</h3><button class="iconbtn group-add-btn" onclick="addMyGroup('${id}')" aria-label="Adicionar grupo muscular" title="Adicionar grupo muscular">＋</button></div>
+    ${groups||'<div class="empty">Adicione o primeiro grupo muscular.</div>'}
+    <button class="primary full" onclick="saveMyWorkoutHeader('${id}')">✓ Salvar Treino</button>`,"training-edit");
 }
-function saveMyWorkoutHeader(id){ const w=getMyWorkout(id); if(!w)return; w.name=document.getElementById('f2Name')?.value.trim()||w.name; w.description=document.getElementById('f2Desc')?.value.trim()||""; w.level=document.getElementById('f2Level')?.value||w.level; w.updatedAt=new Date().toISOString(); saveMyWorkouts(); editMyWorkout(id); }
+function saveMyWorkoutHeader(id){ const w=getMyWorkout(id); if(!w)return; const name=document.getElementById('f2Name')?.value.trim(); if(!name){alert("Informe o nome do treino."); return;} w.name=name; w.description=document.getElementById('f2Desc')?.value.trim()||""; w.level=document.getElementById('f2Level')?.value||w.level; w.updatedAt=new Date().toISOString(); saveMyWorkouts(); go('trainings'); }
 function addMyGroup(id){ const w=getMyWorkout(id); if(!w)return; const choice=prompt("Nome do grupo muscular:",F2_GROUPS[0]); if(!choice?.trim())return; w.groups.push({id:uid('grupo-'),name:choice.trim(),order:w.groups.length,exercises:[]}); saveMyWorkouts(); editMyWorkout(id); }
 function renameMyGroup(wid,gid){const w=getMyWorkout(wid),g=w?.groups.find(x=>x.id===gid);if(!g)return;const n=prompt("Nome do grupo muscular:",g.name);if(n?.trim()){g.name=n.trim();w.updatedAt=new Date().toISOString();saveMyWorkouts();editMyWorkout(wid);}}
 function removeMyGroup(wid,gid){const w=getMyWorkout(wid);if(!w)return;if(confirm("Remover este grupo e seus exercícios?")){w.groups=w.groups.filter(g=>g.id!==gid);w.groups.forEach((g,i)=>g.order=i);saveMyWorkouts();editMyWorkout(wid);}}
