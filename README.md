@@ -73,3 +73,10 @@ Corrigida a tela de execução para preservar as séries e repetições prescrit
 - Salvar Treino retorna para a tela de Treinos após salvar.
 - Ajustados os textos Adicionar Exercício e Salvar Treino.
 - Cache do Service Worker atualizado para v30.
+
+
+## v31 — Ajustes na tela de execução
+- Botão de série centralizado.
+- Check de série concluída centralizado e não interativo.
+- Textos corrigidos para "Série em Execução", "Iniciar Próxima Série" e "Iniciar Série".
+- Removido o texto "30s entre séries" da interface, mantendo o descanso automático de 30 segundos.
