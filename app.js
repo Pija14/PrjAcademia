@@ -924,27 +924,11 @@ function f2DisplayName(value){
   if(!text)return "";
   return text.toLocaleLowerCase("pt-BR").replace(/(^|[\s\-/])([a-záàâãéêíóôõúç])/giu,(_,sep,ch)=>sep+ch.toLocaleUpperCase("pt-BR"));
 }
-function f2LevelClass(level){
-  const key=String(level||"Personalizado").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
-  if(key.includes("basico"))return "level-basic";
-  if(key.includes("intermediario"))return "level-intermediate";
-  if(key.includes("avancado"))return "level-advanced";
-  return "level-custom";
-}
-function f2LevelLabel(level){
-  const key=String(level||"Personalizado").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
-  if(key.includes("basico"))return "Básico";
-  if(key.includes("intermediario"))return "Intermediário";
-  if(key.includes("avancado"))return "Avançado";
-  return "Personalizado";
-}
-
 function f2WorkoutCard(w){
   const name=f2DisplayName(w.name);
   const count=workoutExerciseCount(w);
-  const level=f2LevelLabel(w.level);
   return `
-    <article class="training-card f2-card ${f2LevelClass(w.level)}"
+    <article class="training-card f2-card"
       onclick="startWorkoutById('${w.id}')"
       role="button"
       tabindex="0"
@@ -971,14 +955,6 @@ function f2WorkoutCard(w){
           <h3>${esc(name)}</h3>
           <div class="exercise-count">${count} ${count===1?'exercício':'exercícios'}</div>
 
-          <div class="f2-level-pill">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="4" y="13" width="4" height="7" rx="1"></rect>
-              <rect x="10" y="9" width="4" height="11" rx="1"></rect>
-              <rect x="16" y="4" width="4" height="16" rx="1"></rect>
-            </svg>
-            <span>${esc(level)}</span>
-          </div>
         </div>
       </div>
 
@@ -1026,17 +1002,7 @@ function deleteMyWorkout(id){
 }
 function renderTrainings(){
   ensurePhase2Data();
-  const cards=db.myWorkouts.filter(w=>w.active!==false).map(w=>`<article class="training-card f2-card ${f2LevelClass(w.level)}" onclick="startWorkoutById('${w.id}')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();startWorkoutById('${w.id}')}" aria-label="Abrir treino ${esc(f2DisplayName(w.name))}">
-    <h3>${esc(f2DisplayName(w.name))}</h3>
-    <div class="exercise-count">${workoutExerciseCount(w)} exercícios</div>
-    <button class="training-delete card-delete"
-      onclick="event.stopPropagation();deleteMyWorkout('${w.id}')"
-      aria-label="Excluir treino" title="Excluir treino">×</button>
-    <div class="card-actions">
-      <button class="primary icon-action" onclick="event.stopPropagation();startWorkoutById('${w.id}')" aria-label="Iniciar treino" title="Iniciar treino">▶</button>
-      <button class="secondary icon-action" onclick="event.stopPropagation();editMyWorkout('${w.id}')" aria-label="Editar treino" title="Editar treino">✎</button>
-    </div>
-  </article>`).join("");
+  const cards=db.myWorkouts.filter(w=>w.active!==false).map(f2WorkoutCard).join("");
   layout(`<div class="training-grid">${cards||'<div class="empty big">Nenhum treino ativo.</div>'}</div>` ,"trainings");
 }
 function renderNewWorkout(){
