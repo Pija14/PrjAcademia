@@ -102,3 +102,23 @@ button:disabled{opacity:.45;cursor:not-allowed;transform:none!important}
 /* Fase 2 - múltiplos treinos */
 .page-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0 18px}.page-title-row h3{margin:0}.primary.small{padding:10px 14px;font-size:13px}.card-actions{display:flex;gap:8px;margin-top:12px}.card-actions>*{flex:1}.f2-card{min-width:0}.f2-group{margin-bottom:12px}.f2-exercise{align-items:center}.f2-exercise>div:last-child{display:flex;gap:3px}.f2-group .page-title-row{margin-bottom:10px}.f2-group small{color:var(--muted,#6b7280)}
 .settings-card textarea{width:100%;box-sizing:border-box;resize:vertical;border:1px solid var(--border,#ddd);border-radius:10px;padding:10px;font:inherit;background:var(--surface,#fff)}
+
+
+/* Melhorias UX/UI - Tela de Treinos */
+.training-card{position:relative;overflow:hidden;transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
+.training-card:active{transform:scale(.995)}
+.training-card.level-basic{background:#f2f7ff;border-color:#dbe9f8}
+.training-card.level-intermediate{background:#f2faf5;border-color:#d9efdf}
+.training-card.level-advanced{background:#fffaf0;border-color:#f2e6bd}
+.training-card.level-custom{background:#fff5f5;border-color:#f2dddd}
+.training-card.level-basic .badge{background:#e5f0fc;color:#356a9b}
+.training-card.level-intermediate .badge{background:#e3f4e8;color:#287345}
+.training-card.level-advanced .badge{background:#fff1c9;color:#8a6918}
+.training-card.level-custom .badge{background:#fbe5e5;color:#a33d3d}
+.training-delete{position:absolute;top:12px;right:12px;width:40px;height:40px;border:1px solid rgba(185,28,28,.10);border-radius:12px;background:rgba(255,255,255,.72);color:#b42318;display:grid;place-items:center;font-size:17px;line-height:1;z-index:2;touch-action:manipulation;-webkit-tap-highlight-color:transparent;box-shadow:0 2px 8px rgba(23,33,43,.05)}
+.training-delete:active{transform:scale(.94);background:#fff0f0}
+.training-card h3{padding-right:46px}
+.home-training-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 10px}
+.home-training-head>span{font-size:12px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.home-training-head .compact{min-height:38px}
+@media(max-width:380px){.training-delete{width:38px;height:38px;top:10px;right:10px}.training-card{padding:14px}.card-actions{gap:6px}.card-actions>*{min-width:0;padding-left:10px;padding-right:10px}}
