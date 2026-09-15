@@ -1,0 +1,29 @@
+/* GymIA — tela de login */
+:root{--gym-navy:#0A192B;--gym-blue:#1E4D8C;--gym-light:#F5F7FA;--gym-border:#D9E2EC;--gym-muted:#64748B;--gym-accent:#3B82F6}
+.gymia-login{position:fixed;inset:0;z-index:9999;display:flex;justify-content:center;overflow:auto;background:var(--gym-light);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--gym-navy)}
+.gymia-login[hidden]{display:none}
+.gymia-login__screen{width:min(100%,620px);min-height:100dvh;padding:30px 24px 34px;display:flex;flex-direction:column;align-items:center;background:#F8FAFC}
+.gymia-login__brand{text-align:center;margin:34px 0 30px}
+.gymia-login__logo{width:116px;height:116px;display:block;margin:0 auto 8px}
+.gymia-login__name{font-size:48px;line-height:1;font-weight:850;letter-spacing:-2.5px;margin:0;color:var(--gym-navy)}
+.gymia-login__tagline{margin:12px 0 0;font-size:11px;font-weight:800;letter-spacing:.22em;color:var(--gym-blue)}
+.gymia-login__form{width:100%;display:grid;gap:14px}
+.gymia-login__field{height:58px;border:1px solid var(--gym-border);border-radius:17px;background:#fff;display:flex;align-items:center;padding:0 16px;box-shadow:0 3px 12px rgba(10,25,43,.035)}
+.gymia-login__field:focus-within{border-color:#9CBDE7;box-shadow:0 0 0 3px rgba(59,130,246,.10)}
+.gymia-login__field svg{width:23px;height:23px;flex:0 0 auto;color:var(--gym-blue)}
+.gymia-login__field input{width:100%;height:100%;border:0;outline:0;background:transparent;margin-left:13px;font-size:16px;color:var(--gym-navy)}
+.gymia-login__field input::placeholder{color:#7B8CA1}
+.gymia-login__eye{border:0;background:transparent;padding:8px;color:var(--gym-blue);display:grid;place-items:center}
+.gymia-login__eye svg{margin:0}
+.gymia-login__primary,.gymia-login__secondary{height:58px;border-radius:17px;font-size:16px;font-weight:850;transition:transform .15s,box-shadow .15s}
+.gymia-login__primary{margin-top:2px;background:var(--gym-navy);color:#fff;box-shadow:0 8px 18px rgba(10,25,43,.16)}
+.gymia-login__primary:active,.gymia-login__secondary:active{transform:scale(.985)}
+.gymia-login__link{border:0;background:none;color:#3973B9;font-size:14px;font-weight:700;padding:2px;margin:0 auto}
+.gymia-login__or{display:flex;align-items:center;gap:14px;color:#718096;font-size:13px;font-weight:800;margin:4px 0}
+.gymia-login__or:before,.gymia-login__or:after{content:"";height:1px;background:#D5DFE9;flex:1}
+.gymia-login__secondary{background:#fff;border:1.5px solid #6EA0DD;color:#1E5EA8}
+.gymia-login__footer{margin-top:auto;padding-top:48px;text-align:center;color:#64748B;font-size:15px;font-weight:650;line-height:1.45}
+.gymia-login__error{display:none;color:#B42318;background:#FEF3F2;border:1px solid #FECACA;border-radius:12px;padding:10px 12px;font-size:12px;font-weight:700}
+.gymia-login__error.show{display:block}
+@media(max-width:390px){.gymia-login__screen{padding-left:18px;padding-right:18px}.gymia-login__name{font-size:43px}.gymia-login__brand{margin-top:24px}.gymia-login__logo{width:104px;height:104px}}
+@media(min-width:621px){.gymia-login{background:#E7ECF2}.gymia-login__screen{box-shadow:0 0 40px rgba(10,25,43,.08)}}
