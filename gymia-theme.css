@@ -14,3 +14,11 @@ body{background:var(--bg);color:var(--ink)}.shell{background:var(--bg)}
 .calendar .cal-day.has{border-color:#9DB7D4;background:#EEF4FA}.calendar .cal-day i{color:var(--primary-2)}
 .gymia-login{background:var(--bg)}.gymia-login__screen{background:#fff}.gymia-login__tagline{color:var(--muted)}.gymia-login__field{border-color:var(--line);background:#F8FAFC}.gymia-login__field:focus-within{border-color:#8FB4E4;box-shadow:0 0 0 3px rgba(59,130,246,.10)}.gymia-login__remember input{accent-color:var(--accent)}.gymia-login__link{color:var(--accent)}.gymia-login__secondary{border-color:var(--primary);color:var(--primary)}.gymia-login__footer:before{background:linear-gradient(165deg,transparent 35%,var(--accent) 36%,var(--primary) 100%)}
 @media(min-width:621px){body{background:#EAF0F6}.shell{background:var(--bg)}}
+
+/* Ajustes da tela inicial — sem textos promocionais, faixa inferior ou rolagem */
+.hero{display:none!important}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;overflow-x:hidden;overflow-y:hidden;overscroll-behavior:none}
+.shell{height:100dvh;min-height:100dvh;max-height:100dvh;overflow:hidden;padding-bottom:72px}
+main{overflow:hidden;max-width:100%;}
+.bottomnav{background:#fff!important;border-top:0!important;box-shadow:none!important;bottom:0;}
+.bottomnav::before,.bottomnav::after{display:none!important;content:none!important}
