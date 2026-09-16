@@ -29,7 +29,6 @@
             <div class="gymia-login__or">ou</div>
             <button class="gymia-login__secondary" type="button" id="gymia-register">${icon('user')}<span>Criar uma conta</span></button>
           </form>
-          <div class="gymia-login__footer"><span>Disciplina hoje,</span><span>resultados amanhã.</span></div>
         </div>
       </section>`);
 
