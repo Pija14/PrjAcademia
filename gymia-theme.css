@@ -1,0 +1,16 @@
+/* GymIA Design System — baseado na identidade do logo */
+:root{--bg:#F8FAFC;--card:#FFFFFF;--ink:#0A192B;--muted:#64748B;--line:#D9E2EC;--primary:#0A192B;--primary-2:#1E4D8C;--accent:#3B82F6;--soft:#E6EEF8;--success:#2563A8;--danger:#DC2626}
+body{background:var(--bg);color:var(--ink)}.shell{background:var(--bg)}
+.topbar{background:rgba(248,250,252,.96);backdrop-filter:blur(10px);border-bottom:1px solid rgba(217,226,236,.65)}.topbar h1,h2,h3{color:var(--ink)}
+.eyebrow,.muted,.stats span,.exercise-count,.training-card p,.list-card small{color:var(--muted)}
+.iconbtn{color:var(--ink);border:1px solid var(--line);box-shadow:0 4px 18px rgba(10,25,43,.06)}
+.hero{background:linear-gradient(135deg,var(--primary),var(--primary-2));box-shadow:0 12px 28px rgba(10,25,43,.16)}.hero p{color:#DCE8F5}.pill{background:rgba(255,255,255,.12)}
+.stats>div,.training-card,.list-card,.section,.focus-card,.sets-card,.rest-card,.register-box,.settings-card{border-color:var(--line);box-shadow:0 5px 18px rgba(10,25,43,.045)}
+.badge{background:var(--soft);color:var(--primary-2)}.primary,.gymia-login__primary{background:var(--primary)}.secondary{background:#EFF4F9;color:var(--ink)}.timer-start,.complete-exercise{background:var(--accent)}.recent{background:var(--soft)}
+.bottomnav{background:#fff;border-top-color:var(--line);box-shadow:0 -4px 18px rgba(10,25,43,.045)}.bottomnav button{background:#fff;color:#7B8CA1}.bottomnav .active{color:var(--accent)}
+.workout-progress div{background:var(--accent)}.section-title{background:#EEF4FA;color:var(--primary-2)}
+.exercise-form input,.exercise-form select,.set-row input,.manual-set input,.settings-card select{background:#F8FAFC;border-color:var(--line);color:var(--ink)}.exercise-form input:focus,.exercise-form select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,.12)}
+.add-exercise{color:var(--primary-2);border-color:#9DB7D4}.restore-exercise{background:var(--soft);color:var(--primary-2)}.complete-icon{background:var(--soft);color:var(--accent)}.check.done{background:#E8F1FB;color:var(--primary-2)}.last-load{background:var(--soft);color:var(--primary-2)}.seg button{background:#EEF4FA;color:var(--ink)}
+.calendar .cal-day.has{border-color:#9DB7D4;background:#EEF4FA}.calendar .cal-day i{color:var(--primary-2)}
+.gymia-login{background:var(--bg)}.gymia-login__screen{background:#fff}.gymia-login__tagline{color:var(--muted)}.gymia-login__field{border-color:var(--line);background:#F8FAFC}.gymia-login__field:focus-within{border-color:#8FB4E4;box-shadow:0 0 0 3px rgba(59,130,246,.10)}.gymia-login__remember input{accent-color:var(--accent)}.gymia-login__link{color:var(--accent)}.gymia-login__secondary{border-color:var(--primary);color:var(--primary)}.gymia-login__footer:before{background:linear-gradient(165deg,transparent 35%,var(--accent) 36%,var(--primary) 100%)}
+@media(min-width:621px){body{background:#EAF0F6}.shell{background:var(--bg)}}
